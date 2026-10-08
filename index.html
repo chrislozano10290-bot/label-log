@@ -1,0 +1,1256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Label Log</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Label Log">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1C1C1C" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FFFFFF; --ink:#000000; --sub:#5C5C5C; --field:#F2F2EE; --line:#000000;
+  --hi:#FFE14D; --hi-ink:#000000; --over:#C2261D; --ok:#1E7D3A; --soft:#E4E4DF;
+  --font:"Libre Franklin","Helvetica Neue",Helvetica,Arial,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#1C1C1C; --ink:#F4F4F0; --sub:#A8A8A2; --field:#2A2A28; --line:#F4F4F0;
+    --hi:#E9C83A; --hi-ink:#000000; --over:#FF6B5E; --ok:#5FD08A; --soft:#3A3A37;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#1C1C1C; --ink:#F4F4F0; --sub:#A8A8A2; --field:#2A2A28; --line:#F4F4F0;
+  --hi:#E9C83A; --hi-ink:#000000; --over:#FF6B5E; --ok:#5FD08A; --soft:#3A3A37;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.45}
+body{min-height:100%}
+img{max-width:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--hi);outline-offset:2px}
+.wrap{max-width:560px;margin:0 auto;padding:16px 16px 110px}
+header.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:6px 0 12px;border-bottom:10px solid var(--line)}
+header.top h1{margin:0;font-weight:900;font-size:2rem;letter-spacing:-.02em;line-height:1}
+.status{font-size:.8rem;color:var(--sub);text-align:right}
+h2{font-weight:900;font-size:1.5rem;margin:22px 0 8px;letter-spacing:-.01em}
+h3{font-weight:700;font-size:1.05rem;margin:18px 0 6px}
+p{margin:6px 0}
+.muted{color:var(--sub);font-size:.9rem}
+.small{font-size:.82rem}
+.rule{border:0;border-top:1px solid var(--line);margin:10px 0}
+.rule.med{border-top-width:5px}
+.rule.thick{border-top-width:10px}
+
+/* bottom nav */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--paper);border-top:3px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);z-index:20}
+nav.tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+nav.tabs button{background:none;border:0;padding:12px 4px 13px;font-weight:700;font-size:.85rem;cursor:pointer;color:var(--sub)}
+nav.tabs button[aria-current="page"]{color:var(--ink);box-shadow:inset 0 5px 0 var(--ink)}
+
+/* buttons & fields */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:2px solid var(--ink);background:var(--ink);color:var(--paper);padding:10px 16px;font-weight:700;border-radius:4px;cursor:pointer;min-height:44px}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.hi{background:var(--hi);color:var(--hi-ink);border-color:var(--hi)}
+.btn.sm{padding:6px 10px;min-height:34px;font-size:.88rem}
+.btn.danger{background:transparent;color:var(--over);border-color:var(--over)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.grow{flex:1 1 auto}
+label.f{display:block;font-weight:700;font-size:.85rem;margin:10px 0 4px}
+input[type=text],input[type=number],input[type=date],input[type=url],input[type=password],select,textarea{width:100%;background:var(--field);border:1px solid transparent;border-bottom:2px solid var(--ink);padding:9px 10px;border-radius:3px 3px 0 0;min-height:42px}
+input:focus,select:focus,textarea:focus{outline:none;border-bottom-color:var(--hi);box-shadow:0 2px 0 var(--hi)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.grid3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:0 8px}
+
+/* the label panel */
+.label{border:3px solid var(--line);padding:6px 10px 10px;margin-top:14px}
+.label .t{font-weight:900;font-size:2.4rem;line-height:1;letter-spacing:-.03em;margin:2px 0 4px}
+.label .s{font-size:.95rem}
+.label .calrow{display:flex;justify-content:space-between;align-items:flex-end;font-weight:900}
+.label .calrow .k{font-size:1.6rem}
+.label .calrow .v{font-size:3rem;line-height:.95;letter-spacing:-.03em}
+.label .goalline{font-size:.9rem;margin-top:2px}
+.nrow{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-top:1px solid var(--line);font-size:.95rem;position:relative}
+.nrow b{font-weight:900}
+.nrow.ind{padding-left:16px}
+.nrow.goal{display:block}
+.nrow.goal .top{display:flex;justify-content:space-between;gap:10px;position:relative;z-index:1}
+.meter{height:10px;background:var(--soft);margin-top:4px;position:relative;overflow:hidden}
+.meter i{position:absolute;left:0;top:0;bottom:0;background:var(--hi)}
+.meter i.over{background:var(--over)}
+.over-t{color:var(--over);font-weight:700}
+
+/* lists */
+.meal{margin-top:14px}
+.meal h3{display:flex;justify-content:space-between;border-bottom:5px solid var(--line);padding-bottom:4px;margin-bottom:0}
+.entry{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--soft)}
+.entry .grow{min-width:0}
+.entry .nm{font-weight:700;overflow-wrap:anywhere}
+.entry .kc{font-weight:900;white-space:nowrap}
+.x{background:none;border:0;color:var(--sub);cursor:pointer;font-size:1.2rem;line-height:1;padding:4px 6px;min-width:34px;min-height:34px}
+.x:hover{color:var(--over)}
+details.ing summary{cursor:pointer;color:var(--sub);font-size:.85rem}
+details.ing ul{margin:4px 0 0;padding-left:18px;font-size:.85rem}
+.food{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--soft)}
+.food .grow{min-width:0}
+.tag{display:inline-block;font-size:.72rem;font-weight:700;border:1px solid var(--ink);padding:0 5px;border-radius:2px;margin-left:6px;vertical-align:2px}
+.empty{border:2px dashed var(--soft);padding:18px;text-align:center;color:var(--sub);margin-top:12px}
+.note{background:var(--field);border-left:5px solid var(--hi);padding:10px 12px;margin:10px 0;font-size:.9rem}
+.note.warn{border-left-color:var(--over)}
+.note ul{margin:4px 0 0;padding-left:18px}
+.photos{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.photos img{width:140px;height:140px;object-fit:cover;border:2px solid var(--line)}
+.datebar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:14px}
+.datebar .d{font-weight:900;font-size:1.15rem;text-align:center;flex:1}
+.seg{display:inline-flex;border:2px solid var(--ink);border-radius:4px;overflow:hidden}
+.seg button{background:transparent;border:0;padding:6px 12px;font-weight:700;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.chart{width:100%;overflow-x:auto}
+.chart svg{display:block;width:100%;height:auto}
+table.t{width:100%;border-collapse:collapse;font-size:.9rem}
+table.t td,table.t th{padding:6px 4px;border-bottom:1px solid var(--soft);text-align:left}
+table.t th{border-bottom:3px solid var(--line)}
+.tablewrap{overflow-x:auto}
+dialog{border:3px solid var(--line);background:var(--paper);color:var(--ink);padding:0;width:min(520px,calc(100vw - 24px));max-height:calc(100vh - 40px);border-radius:4px}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+dialog .dbody{padding:16px}
+dialog h2{margin-top:0}
+.ingrow{display:grid;grid-template-columns:1fr 84px 92px 34px;gap:6px;align-items:end;margin-top:6px}
+.hidden{display:none !important}
+.chip{display:inline-block;border:2px solid var(--ink);background:transparent;border-radius:999px;padding:6px 12px;margin:4px 6px 0 0;font-weight:700;font-size:.85rem;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip:hover{background:var(--hi);color:var(--hi-ink);border-color:var(--hi)}
+.nrow.dvh{border-top:0;font-size:.8rem;justify-content:flex-end;padding-top:0}
+.foot{font-size:.75rem;color:var(--sub);border-top:5px solid var(--line);margin-top:4px;padding-top:4px}
+.card{border:3px solid var(--line);padding:12px;margin-top:12px}
+.card h3{margin-top:0}
+.chk{display:flex;gap:8px;font-size:.88rem;padding:3px 0}
+.chk .m{font-weight:900;width:16px;flex:0 0 16px}
+.chk .m.ok{color:var(--ok)} .chk .m.no{color:var(--over)}
+.src{font-size:.75rem;color:var(--sub);white-space:nowrap}
+a{color:var(--ink)}
+.tnum{font-variant-numeric:tabular-nums}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:4px;font-weight:700;z-index:50;max-width:90vw}
+@media (prefers-reduced-motion:no-preference){ .meter i{transition:width .4s ease} }
+@media (max-width:380px){ .label .calrow .v{font-size:2.4rem} .label .t{font-size:2rem} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Label Log</h1>
+    <div class="status" id="status">Loading…</div>
+  </header>
+
+  <!-- TODAY -->
+  <main id="v-today" data-view>
+    <div class="datebar">
+      <button class="btn ghost sm" id="dPrev" aria-label="Previous day">‹</button>
+      <div class="d" id="dLabel"></div>
+      <button class="btn ghost sm" id="dNext" aria-label="Next day">›</button>
+    </div>
+    <div class="row" style="margin-top:8px;justify-content:space-between">
+      <label class="row small"><input type="checkbox" id="restDay"> Rest day</label>
+      <input type="date" id="dPick" style="max-width:170px" aria-label="Pick a date">
+    </div>
+    <div id="todayPanel"></div>
+    <div id="extras"></div>
+    <div id="recent"></div>
+    <section id="planBox"></section>
+    <div class="row" style="margin-top:14px">
+      <button class="btn grow" id="goScan">Scan a label</button>
+      <button class="btn ghost grow" id="goLog">Log a saved food</button>
+    </div>
+    <div id="meals"></div>
+    <div id="ingBreak"></div>
+  </main>
+
+  <!-- SCAN / ADD -->
+  <main id="v-scan" data-view class="hidden">
+    <h2>Add a food</h2>
+    <div id="scanBox">
+      <p class="muted">Photograph the Nutrition Facts panel straight on, close enough to fill the frame. Add a second photo of the front if you want the name read too.</p>
+      <div class="row" style="margin-top:10px">
+        <label class="btn hi" for="photo">Take a photo</label>
+        <input id="photo" type="file" accept="image/*" capture="environment" class="hidden">
+        <label class="btn ghost" for="photoLib">Choose from photos</label>
+        <input id="photoLib" type="file" accept="image/*" multiple class="hidden">
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="readBtn" disabled>Read label</button>
+        <button class="btn ghost hidden" id="stopBtn">Stop</button>
+        <button class="btn ghost sm hidden" id="clearPhotos">Clear photos</button>
+      </div>
+      <div class="photos" id="photos"></div>
+      <p id="readMsg" class="muted"></p>
+    </div>
+    <p id="noScan" class="note hidden">Photo reading turns on once your Anthropic API key is saved in the Label Log Sync script (Project Settings, Script properties, ANTHROPIC_API_KEY) and the app has synced once. Until then, type the numbers from the label below.</p>
+    <div id="readNotes"></div>
+    <form id="foodForm" autocomplete="off"></form>
+  </main>
+
+  <!-- FOODS -->
+  <main id="v-foods" data-view class="hidden">
+    <h2>Foods and recipes</h2>
+    <div class="row">
+      <input type="text" id="foodSearch" class="grow" placeholder="Search your foods" aria-label="Search your foods" style="flex:1 1 200px">
+      <button class="btn" id="newRecipe">Build a recipe</button>
+    </div>
+    <div id="foodList"></div>
+  </main>
+
+  <!-- PROGRESS -->
+  <main id="v-progress" data-view class="hidden">
+    <h2>Progress</h2>
+    <div class="seg" role="group" aria-label="Range" id="rangeSeg">
+      <button data-r="7" aria-pressed="true">7 days</button>
+      <button data-r="14" aria-pressed="false">14 days</button>
+      <button data-r="30" aria-pressed="false">30 days</button>
+    </div>
+    <h3>Calories each day</h3>
+    <div class="chart" id="calChart"></div>
+    <h3>Protein each day</h3>
+    <div class="chart" id="proChart"></div>
+    <h3>Averages on days you logged</h3>
+    <div class="tablewrap" id="avgTable"></div>
+    <h3>Body weight</h3>
+    <div class="row">
+      <input type="date" id="wDate" style="max-width:170px" aria-label="Weigh-in date">
+      <input type="number" id="wVal" step="0.1" min="0" placeholder="lb" style="max-width:110px" aria-label="Weight in pounds">
+      <button class="btn" id="wSave">Save weigh-in</button>
+    </div>
+    <div class="chart" id="wChart"></div>
+    <div id="wList"></div>
+  </main>
+
+  <!-- MORE -->
+  <main id="v-more" data-view class="hidden">
+    <h2>Training blocks</h2>
+    <p class="muted">Plan each block once. On any day inside a block, Today uses that block's targets, and rest days switch to the block's rest-day numbers.</p>
+    <button class="btn" id="newBlock" style="margin-top:8px">Plan a training block</button>
+    <div id="blockList"></div>
+    <h2>Default targets</h2>
+    <p class="muted small">Used on days that aren't inside a training block.</p>
+    <form id="goalForm"></form>
+    <h2>Sync with your spreadsheet</h2>
+    <p class="muted">Everything saves on this phone first, so the app works with no signal. When you're online, changes are sent to THEMAGNUMOPUS automatically: Food Log gets one row per food, Food Daily Totals adds up each day, and Food Library, Weigh-ins, Training Blocks and Rest Days hold the rest.</p>
+    <p class="small" id="syncInfo">–</p>
+    <div class="row" style="margin-top:8px">
+      <button class="btn grow" id="syncBtn">Sync now</button>
+      <a class="btn ghost grow" id="openSheet" href="#" target="_blank" rel="noopener" style="text-decoration:none">Open the sheet</a>
+    </div>
+    <p class="muted small">If you edit food rows directly in the sheet, use "Reload from sheet" to bring them onto this phone. It only runs when nothing is waiting to sync, so it can't wipe out unsent entries.</p>
+    <button class="btn ghost" id="pullBtn" style="margin-top:4px">Reload from sheet</button>
+    <details style="margin-top:12px"><summary class="small">Connect manually</summary>
+      <p class="muted small">Only needed if the setup link didn't work. Both values are in the Label Log Sync script's execution log.</p>
+      <label class="f" for="cfgUrl">Sync URL (ends in /exec)</label><input id="cfgUrl" type="url" autocomplete="off" spellcheck="false">
+      <label class="f" for="cfgTok">Sync password</label><input id="cfgTok" type="password" autocomplete="off" spellcheck="false">
+      <button class="btn" id="cfgSave" style="margin-top:8px">Connect</button>
+    </details>
+    <h2>Where the numbers come from</h2>
+    <p class="small">Every amount you log is your amount ÷ the label's serving size, times each number on the label. Logging 85 g of something with a 55 g serving counts 1.55 servings.</p>
+    <p class="small">Labels are rounded by law, so "4 × carbs + 4 × protein + 9 × fat" rarely matches the printed calories exactly. The app checks this after a scan and only flags it when the gap is large enough to suggest a misread.</p>
+    <p class="small">Recipes divide the sum of every ingredient by the number of servings you say it makes. When you log a recipe, the entry keeps how much of each ingredient was in your portion.</p>
+    <p class="small">"Suggest the rest of today" asks Claude to pick only from foods you've saved. Claude chooses foods and servings; the app does all the math itself from your saved labels, so the totals shown never come from Claude.</p>
+    <p class="small">Each label read and each suggestion is a separate, paid call to the Anthropic API using your own key.</p>
+    <h3>Sources used by the block planner and % Daily Value</h3>
+    <div id="srcList" class="small"></div>
+  </main>
+</div>
+
+<nav class="tabs" aria-label="Sections">
+  <div class="in">
+    <button data-tab="today" aria-current="page">Today</button>
+    <button data-tab="scan">Add</button>
+    <button data-tab="foods">Foods</button>
+    <button data-tab="progress">Progress</button>
+    <button data-tab="more">Plan</button>
+  </div>
+</nav>
+
+<dialog id="logDlg"><div class="dbody" id="logBody"></div></dialog>
+<dialog id="recDlg"><div class="dbody" id="recBody"></div></dialog>
+<dialog id="blkDlg"><div class="dbody" id="blkBody"></div></dialog>
+
+<script>
+"use strict";
+/* ---------- constants ---------- */
+const NUTS = [
+  {k:"cal",l:"Calories",u:""},
+  {k:"fat",l:"Total fat",u:"g",dv:78},
+  {k:"sat",l:"Saturated fat",u:"g",ind:true,dv:20},
+  {k:"trans",l:"Trans fat",u:"g",ind:true},
+  {k:"chol",l:"Cholesterol",u:"mg",dv:300},
+  {k:"sodium",l:"Sodium",u:"mg",dv:2300},
+  {k:"carbs",l:"Total carbohydrate",u:"g",dv:275},
+  {k:"fiber",l:"Dietary fiber",u:"g",ind:true,dv:28},
+  {k:"sugar",l:"Total sugars",u:"g",ind:true},
+  {k:"added",l:"Added sugars",u:"g",ind:true,dv:50},
+  {k:"protein",l:"Protein",u:"g",dv:50},
+  {k:"vitd",l:"Vitamin D",u:"mcg",dv:20},
+  {k:"calcium",l:"Calcium",u:"mg",dv:1300},
+  {k:"iron",l:"Iron",u:"mg",dv:18},
+  {k:"potassium",l:"Potassium",u:"mg",dv:4700}
+];
+const SCAN_MAP = {cal:"calories",fat:"total_fat_g",sat:"saturated_fat_g",trans:"trans_fat_g",chol:"cholesterol_mg",sodium:"sodium_mg",carbs:"total_carbohydrate_g",fiber:"dietary_fiber_g",sugar:"total_sugars_g",added:"added_sugars_g",protein:"protein_g",vitd:"vitamin_d_mcg",calcium:"calcium_mg",iron:"iron_mg",potassium:"potassium_mg"};
+const SRC = {
+  issn:{t:"International Society of Sports Nutrition position stand: protein and exercise (2017)", u:"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5477153/", w:"Protein: 1.4–2.0 g/kg a day for building and keeping muscle; 2.3–3.1 g/kg may be needed to keep muscle while dieting."},
+  acsm:{t:"ACSM, Academy of Nutrition and Dietetics & Dietitians of Canada: Nutrition and Athletic Performance (2016)", u:"https://doi.org/10.1249/MSS.0000000000000852", w:"Carbs by training load: light 3–5, moderate (~1 h/day) 5–7, high (1–3 h/day) 6–10, very high (4–5 h/day) 8–12 g/kg a day. Fat: 20–35% of calories."},
+  helms:{t:"Helms, Aragon & Fitschen: natural bodybuilding contest preparation (2014)", u:"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4033492/", w:"Losing weight: 0.5–1% of body weight a week. About 3,500 calories per pound of fat, which is a rough rule."},
+  iraki:{t:"Iraki, Fitschen, Espinar & Helms: off-season nutrition for bodybuilders (2019)", u:"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6680710/", w:"Gaining: about 0.25–0.5% of body weight a week for novice and intermediate lifters."},
+  fda:{t:"FDA: Daily Value on the Nutrition and Supplement Facts labels", u:"https://www.fda.gov/media/135301/download", w:"% Daily Value reference amounts (for example vitamin D 20 mcg, calcium 1,300 mg, iron 18 mg, potassium 4,700 mg)."}
+};
+const LOADS = {light:{lo:3,hi:5,l:"Light: low-intensity or skill work"}, moderate:{lo:5,hi:7,l:"Moderate: about 1 hour a day"}, high:{lo:6,hi:10,l:"High: 1 to 3 hours a day, moderate to hard"}, veryhigh:{lo:8,hi:12,l:"Very high: 4 to 5 hours a day"}};
+const GOALS = {gain:{l:"Gain (lean bulk)",rate:0.25,lo:0.25,hi:0.5,plo:1.4,phi:2.0,p:2.0,src:"iraki"}, maintain:{l:"Maintain or recomp",rate:0,lo:0,hi:0,plo:1.4,phi:2.0,p:2.0}, lose:{l:"Lose (cut)",rate:0.5,lo:0.5,hi:1.0,plo:2.3,phi:3.1,p:2.3,src:"helms"}};
+const FOCI = ["Concurrent (lifting + running)","Strength","Hypertrophy","Power / peaking","Endurance"];
+const MEALS = ["Breakfast","Lunch","Dinner","Snacks"];
+const DEFAULT_PROFILE = {goals:{cal:3000,protein:200,carbs:350,fat:85,restCal:null,weightGoal:200},weights:[],blocks:[]};
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid6 = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+const clone = o => JSON.parse(JSON.stringify(o));
+const num = v => { if (v === null || v === undefined || v === "") return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
+const isoDate = d => { const z = new Date(d); z.setMinutes(z.getMinutes() - z.getTimezoneOffset()); return z.toISOString().slice(0,10); };
+const today = () => isoDate(new Date());
+const addDays = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return isoDate(d); };
+const prettyDate = iso => new Date(iso + "T12:00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});
+function fmt(v, unit){
+  if (v === null || v === undefined || !Number.isFinite(v)) return "–";
+  if (unit === "" || (unit === "mg" && Math.abs(v) >= 10)) return Math.round(v).toLocaleString();
+  return (Math.abs(v) < 10 ? Math.round(v*10)/10 : Math.round(v)).toLocaleString();
+}
+function toast(msg){
+  const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2400);
+}
+function scaleN(n, m){ const o = {}; for (const {k} of NUTS) o[k] = (n && num(n[k]) !== null) ? n[k]*m : null; return o; }
+function sumN(list){
+  const o = {}; for (const {k} of NUTS) o[k] = 0;
+  for (const n of list) for (const {k} of NUTS) if (n && num(n[k]) !== null) o[k] += n[k];
+  return o;
+}
+
+/* ---------- state ---------- */
+let profile = clone(DEFAULT_PROFILE);
+const foods = new Map();
+const logs = new Map();
+let curDate = today();
+let mode = "loading"; // "cloud" | "local"
+let sheetUrl = null; let hasKey = false;
+
+/* ---------- storage: this phone first, then your Google Sheet ---------- */
+// Everything is kept in IndexedDB on the phone. Changes go into an outbox and are sent when there's signal.
+const DB_NAME = "labellog", STORE = "kv";
+let dbP = null;
+function idb(){
+  return dbP = dbP || new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function kv(mode, key, val){
+  const db = await idb();
+  return new Promise((res, rej) => {
+    const st = db.transaction(STORE, mode === "get" ? "readonly" : "readwrite").objectStore(STORE);
+    const q = mode === "get" ? st.get(key) : mode === "del" ? st.delete(key) : st.put(val, key);
+    q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
+  });
+}
+const kvGet = k => kv("get", k), kvSet = (k, v) => kv("set", k, v);
+
+let cfg = {url:"", token:"", hasKey:false, sheetUrl:null, lastSync:null};
+let outbox = {};          // path -> {op, args, v}; a newer change to the same thing replaces the older one
+let syncing = false, syncTimer = null, lastErr = "", stamp = Date.now();
+
+async function persist(){
+  try { await kvSet("state", {profile, foods:[...foods.values()], days:Object.fromEntries(logs)}); }
+  catch(e){ console.error(e); toast("Couldn't save on this phone: " + String(e.message || e).slice(0,80)); }
+}
+function enqueue(path, op, args){
+  outbox[path] = {op, args, v: ++stamp};
+  persist(); kvSet("outbox", outbox).catch(console.error);
+  updateStatus(); scheduleSync(1200);
+}
+function saveProfile(){ enqueue("p", "llSaveProfile", [clone(profile)]); }
+function saveFood(f){ foods.set(f.id, f); render(); enqueue("f/"+f.id, "llUpsertFood", [clone(f)]); }
+function deleteFood(id){ foods.delete(id); render(); enqueue("f/"+id, "llDeleteFood", [id]); }
+function saveDay(date){
+  const day = logs.get(date) || {date, rest:false, entries:[]}; render();
+  enqueue("l/"+date, "llSaveDay", [clone(Object.assign({}, day, {date}))]);
+}
+function getDay(date){ if (!logs.has(date)) logs.set(date, {date, rest:false, entries:[]}); return logs.get(date); }
+
+// One request to the Label Log Sync script. Anything needing the server fails fast with OFFLINE when there's no signal.
+async function remote(op, args, ms = 90000){
+  if (!cfg.url || !cfg.token) throw new Error("NOT_SET_UP");
+  if (!navigator.onLine) throw new Error("OFFLINE");
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms);
+  let res;
+  try {
+    res = await fetch(cfg.url, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body: JSON.stringify({token: cfg.token, op, args}), signal: ctl.signal, redirect:"follow"});
+  } catch(e){ throw new Error("OFFLINE"); } finally { clearTimeout(t); }
+  const body = await res.json().catch(() => null);
+  if (!body) throw new Error("BAD_REPLY " + res.status);
+  if (!body.ok) throw new Error(body.error || "FAILED");
+  return body.result;
+}
+const gs = (fn, ...args) => remote(fn, args);   // label reading and plan suggestions use this
+
+function scheduleSync(ms = 1500){ clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, ms); }
+async function syncNow(){
+  if (syncing || !cfg.url || !navigator.onLine) { updateStatus(); return; }
+  const paths = Object.keys(outbox);
+  if (!paths.length) { updateStatus(); return; }
+  syncing = true; updateStatus();
+  const batch = paths.map(p => ({path:p, op:outbox[p].op, args:outbox[p].args, v:outbox[p].v}));
+  try {
+    const r = await remote("batch", [batch]);
+    const done = new Set(r && r.done || []);
+    for (const it of batch) if (done.has(it.path) && outbox[it.path] && outbox[it.path].v === it.v) delete outbox[it.path];
+    await kvSet("outbox", outbox);
+    lastErr = r && r.error ? r.error : "";
+    if (done.size){ cfg.lastSync = Date.now(); await kvSet("cfg", cfg); }
+  } catch(e){
+    lastErr = String(e.message || e);
+  } finally {
+    syncing = false; updateStatus();
+    if (Object.keys(outbox).length && lastErr !== "BAD_TOKEN") scheduleSync(lastErr === "OFFLINE" ? 60000 : 30000);
+  }
+}
+async function refreshServerInfo(){
+  try { const s = await remote("ping", [], 30000); cfg.hasKey = hasKey = !!s.hasKey; cfg.sheetUrl = sheetUrl = s.sheetUrl || null; await kvSet("cfg", cfg); setupScanAvailability(); updateStatus(); }
+  catch(e){ if (String(e.message) === "BAD_TOKEN"){ lastErr = "BAD_TOKEN"; updateStatus(); } }
+}
+async function pullFromSheet(quiet){
+  if (Object.keys(outbox).length){ toast("Sync your waiting changes first"); return false; }
+  try {
+    const s = await remote("llGetAll", [], 120000);
+    profile = Object.assign(clone(DEFAULT_PROFILE), s.profile || {});
+    foods.clear(); (s.foods || []).forEach(f => foods.set(f.id, f));
+    logs.clear(); Object.values(s.days || {}).forEach(d => logs.set(d.date, d));
+    cfg.hasKey = hasKey = !!s.hasKey; cfg.sheetUrl = sheetUrl = s.sheetUrl || null; cfg.lastSync = Date.now();
+    await persist(); await kvSet("cfg", cfg); lastErr = "";
+    setupScanAvailability(); render(); updateStatus();
+    if (!quiet) toast("Loaded from your sheet");
+    return true;
+  } catch(e){ lastErr = String(e.message || e); updateStatus(); toast(syncWords(lastErr)); return false; }
+}
+function syncWords(e){
+  if (e === "OFFLINE") return "No signal right now. Your entries are safe on this phone.";
+  if (e === "BAD_TOKEN") return "The sync password doesn't match. Reconnect from the Plan tab.";
+  if (e === "NOT_SET_UP") return "Not connected to your sheet yet.";
+  return "Sync problem: " + e.slice(0, 120);
+}
+function updateStatus(){
+  const n = Object.keys(outbox).length, el = $("#status");
+  let t;
+  if (!cfg.url) t = "Saved on this phone · not connected to your sheet";
+  else if (syncing) t = "Syncing…";
+  else if (!navigator.onLine) t = n ? `Offline · ${n} change${n>1?"s":""} waiting` : "Offline · saved on this phone";
+  else if (n) t = `${n} change${n>1?"s":""} waiting` + (lastErr ? " · " + syncWords(lastErr) : "");
+  else if (lastErr === "BAD_TOKEN") t = syncWords(lastErr);
+  else t = "Synced with your sheet";
+  if (el){
+    if (sheetUrl && t === "Synced with your sheet") el.innerHTML = `<a href="${esc(sheetUrl)}" target="_blank" rel="noopener">${esc(t)}</a>`;
+    else el.textContent = t;
+  }
+  const info = $("#syncInfo");
+  if (info) info.textContent = cfg.url
+    ? `Connected. ${n ? n + " change" + (n>1?"s":"") + " waiting to send." : "Nothing waiting."} Last sync: ${cfg.lastSync ? new Date(cfg.lastSync).toLocaleString() : "never"}.`
+    : "Not connected yet. Open the setup link from your sheet's Label Log Sync script once on this phone.";
+  const os = $("#openSheet"); if (os){ if (sheetUrl) os.href = sheetUrl; os.classList.toggle("hidden", !sheetUrl); }
+}
+async function connect(url, token){
+  url = String(url || "").trim(); token = String(token || "").trim();
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url) || token.length < 20){ toast("That doesn't look like a sync URL and password"); return; }
+  cfg.url = url; cfg.token = token; lastErr = ""; await kvSet("cfg", cfg); updateStatus();
+  const hadData = foods.size || [...logs.values()].some(d => d.entries.length) || (profile.weights||[]).length;
+  if (!hadData) { if (await pullFromSheet(true)) toast("Connected to your sheet"); }
+  else { await refreshServerInfo(); if (lastErr !== "BAD_TOKEN"){ toast("Connected. Sending what's on this phone."); scheduleSync(300); } }
+}
+async function readSetupLink(){
+  const m = location.hash.match(/^#setup=([\w-]+)$/);
+  if (!m) return;
+  history.replaceState(null, "", location.pathname + location.search);   // don't leave the password in the address bar
+  try {
+    const j = JSON.parse(atob(m[1].replace(/-/g, "+").replace(/_/g, "/")));
+    await connect(j.u, j.t);
+  } catch(e){ toast("That setup link didn't work. Try opening it again."); }
+}
+
+async function boot(){
+  render();
+  try {
+    cfg = Object.assign(cfg, await kvGet("cfg") || {});
+    outbox = await kvGet("outbox") || {};
+    const st = await kvGet("state");
+    if (st){
+      profile = Object.assign(clone(DEFAULT_PROFILE), st.profile || {});
+      foods.clear(); (st.foods || []).forEach(f => foods.set(f.id, f));
+      logs.clear(); Object.values(st.days || {}).forEach(d => logs.set(d.date, d));
+    }
+  } catch(e){ toast("This browser blocked on-phone storage. Entries won't be kept offline."); }
+  hasKey = !!cfg.hasKey; sheetUrl = cfg.sheetUrl || null; mode = "sheet";
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  setupScanAvailability(); render(); updateStatus();
+  await readSetupLink();
+  if (cfg.url){ scheduleSync(500); refreshServerInfo(); }
+}
+window.addEventListener("online", () => { updateStatus(); scheduleSync(500); refreshServerInfo(); });
+window.addEventListener("offline", updateStatus);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) scheduleSync(500); });
+window.addEventListener("hashchange", readSetupLink);
+$("#syncBtn").onclick = () => { if (!navigator.onLine) toast(syncWords("OFFLINE")); else if (!Object.keys(outbox).length) toast("Nothing waiting to sync"); syncNow(); };
+$("#pullBtn").onclick = () => { if (confirm("Replace what's on this phone with what's in your sheet?")) pullFromSheet(false); };
+$("#cfgSave").onclick = () => connect($("#cfgUrl").value, $("#cfgTok").value);
+if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(console.error));
+function apiError(e, what){
+  const m = String(e && e.message || e || "");
+  if (m.includes("OFFLINE")) return what === "read" ? "No signal. Reading a label needs internet. Type the numbers below, or try again when you're back online." : "No signal. Suggestions need internet.";
+  if (m.includes("NOT_SET_UP")) return "Connect the app to your sheet first (Plan tab).";
+  if (m.includes("BAD_TOKEN")) return "The sync password doesn't match. Reconnect from the Plan tab.";
+  if (m.includes("NO_KEY")) return "Add your Anthropic API key in the Label Log Sync script (Project Settings, Script properties, ANTHROPIC_API_KEY), then tap Sync now.";
+  if (m.includes("API 401")) return "Your API key was rejected. Check that ANTHROPIC_API_KEY is copied exactly.";
+  if (m.includes("API 429") || m.includes("API 529")) return "The API is busy or you've hit a rate limit. Wait a minute and try again.";
+  if (m.toLowerCase().includes("credit")) return "Your Anthropic API account is out of credit. Add credit in the developer console.";
+  if (m.includes("BAD_JSON")) return what === "read" ? "The label couldn't be read clearly. Try a sharper photo, or type the numbers below." : "Couldn't build a plan from your foods. Try again.";
+  return (what === "read" ? "Couldn't read the label: " : "Couldn't build a plan: ") + m.slice(0, 160);
+}
+function prepImage(file){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file); const img = new Image();
+    img.onload = () => {
+      const max = 1568, s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      resolve({type:"image/jpeg", data:c.toDataURL("image/jpeg", 0.85).split(",")[1]});
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("That photo couldn't be opened. Try taking it again.")); };
+    img.src = url;
+  });
+}
+
+/* ---------- navigation ---------- */
+let curTab = "today";
+function show(tab){
+  curTab = tab;
+  document.querySelectorAll("[data-view]").forEach(v => v.classList.toggle("hidden", v.id !== "v-" + tab));
+  document.querySelectorAll("nav.tabs button").forEach(b => { if (b.dataset.tab === tab) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
+  if (tab === "scan" && !editingId) $("#scanBox").classList.toggle("hidden", !hasKey);
+  render(); window.scrollTo(0,0);
+}
+document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => show(b.dataset.tab));
+
+/* ---------- render ---------- */
+function render(){
+  if (curTab === "today") renderToday();
+  if (curTab === "foods") renderFoods();
+  if (curTab === "progress") renderProgress();
+  if (curTab === "more"){ renderBlocks(); renderGoals(); renderSources(); }
+}
+
+function blockFor(date){ return (profile.blocks||[]).find(b => b.start && b.end && b.start <= date && date <= b.end && b.targets) || null; }
+function targetsFor(date){
+  const d = logs.get(date); const rest = !!(d && d.rest);
+  const b = blockFor(date);
+  if (b){ const t = b.targets; return {block:b, rest, cal: rest ? t.restCal : t.cal, protein:t.protein, carbs: rest ? t.restCarbs : t.carbs, fat:t.fat}; }
+  const g = profile.goals;
+  return {block:null, rest, cal: rest && num(g.restCal) ? g.restCal : g.cal, protein:g.protein, carbs:g.carbs, fat:g.fat};
+}
+function daysBetween(a, b){ return Math.round((new Date(b+"T12:00:00") - new Date(a+"T12:00:00")) / 864e5); }
+function blockWeek(b, date){ return {week: Math.floor(daysBetween(b.start, date)/7) + 1, weeks: Math.ceil((daysBetween(b.start, b.end) + 1)/7)}; }
+function scaleExtra(extra, m){ return (extra||[]).filter(x => x && num(x.amount) !== null).map(x => ({name:x.name, amount:x.amount*m, unit:x.unit||""})); }
+function sumExtra(lists){
+  const mp = new Map();
+  for (const l of lists) for (const x of (l||[])){ const k = x.name.toLowerCase() + "|" + x.unit; const c = mp.get(k) || {name:x.name, unit:x.unit, amount:0}; c.amount += x.amount; mp.set(k, c); }
+  return [...mp.values()].sort((a,b) => a.name.localeCompare(b.name));
+}
+function srcLink(k){ const x = SRC[k]; return x ? `<a class="src" href="${x.u}" target="_blank" rel="noopener">[${k.toUpperCase()}]</a>` : ""; }
+
+function renderToday(){
+  $("#dLabel").textContent = curDate === today() ? "Today, " + prettyDate(curDate) : prettyDate(curDate);
+  $("#dPick").value = curDate;
+  const day = logs.get(curDate) || {entries:[], rest:false};
+  $("#restDay").checked = !!day.rest;
+  const t = sumN(day.entries.map(e => e.n));
+  const T = targetsFor(curDate);
+  const left = num(T.cal) !== null ? T.cal - t.cal : null;
+  const meter = (v, goal) => { if (!num(goal)) return ""; const p = Math.min(100, v/goal*100); return `<div class="meter"><i class="${v>goal?"over":""}" style="width:${p}%"></i></div>`; };
+  const goalRow = (k, l, goal, unit) => `<div class="nrow goal"><div class="top"><span><b>${l}</b> ${fmt(t[k],unit)}${unit}</span><span>${num(goal)?`${fmt(goal,unit)}${unit} target`:""}</span></div>${meter(t[k],goal)}</div>`;
+  const dvRow = (k, ind) => { const n = NUTS.find(x => x.k === k); const pct = n.dv ? Math.round(t[k]/n.dv*100) : null;
+    return `<div class="nrow ${ind?"ind":""}"><span>${ind?n.l:`<b>${n.l}</b>`} ${fmt(t[k],n.u)}${n.u}</span><b class="tnum">${pct!==null?pct+"%":""}</b></div>`; };
+  let srcLine;
+  if (T.block){ const w = blockWeek(T.block, curDate); srcLine = `Targets from ${esc(T.block.name)}, week ${w.week} of ${w.weeks}${T.rest?", rest day":""}`; }
+  else srcLine = `Targets from your defaults${T.rest && num(profile.goals.restCal)?", rest day":""}`;
+  $("#todayPanel").innerHTML = `
+    <section class="label" aria-label="Day totals">
+      <div class="t">Nutrition Facts</div>
+      <div class="s">${day.entries.length} ${day.entries.length===1?"item":"items"} logged</div>
+      <div class="muted small">${srcLine}</div>
+      <hr class="rule thick">
+      <div class="calrow"><span class="k">Calories</span><span class="v">${fmt(t.cal,"")}</span></div>
+      <div class="goalline">${left!==null?`Target ${fmt(T.cal,"")}. ${left>=0?`${fmt(left,"")} left`:`<span class="over-t">${fmt(-left,"")} over</span>`}`:""}</div>
+      ${meter(t.cal, T.cal)}
+      <hr class="rule med">
+      ${goalRow("protein","Protein",T.protein,"g")}
+      ${goalRow("carbs","Total carbohydrate",T.carbs,"g")}
+      ${goalRow("fat","Total fat",T.fat,"g")}
+      <hr class="rule med">
+      <div class="nrow dvh"><b>% Daily Value*</b></div>
+      ${dvRow("sat",true)}${dvRow("trans",true)}${dvRow("chol")}${dvRow("sodium")}${dvRow("fiber",true)}${dvRow("sugar",true)}${dvRow("added",true)}
+      <hr class="rule thick" style="margin:4px 0 0">
+      ${dvRow("vitd")}${dvRow("calcium")}${dvRow("iron")}${dvRow("potassium")}
+      <div class="foot">* % Daily Value uses the FDA's reference amounts for adults ${srcLink("fda")}. Foods with a blank box (label didn't list it) count as zero, so micronutrient totals can run low.</div>
+    </section>`;
+  const ex = sumExtra(day.entries.map(e => e.extra));
+  $("#extras").innerHTML = ex.length ? `<h3>Other vitamins and minerals</h3><div class="tablewrap"><table class="t"><tbody>${ex.map(x=>`<tr><td>${esc(x.name)}</td><td style="text-align:right">${fmt(x.amount,x.unit==="mg"?"g":x.unit)} ${esc(x.unit)}</td></tr>`).join("")}</tbody></table></div><p class="muted small">Only from labels that listed them.</p>` : "";
+  // recent foods
+  const seen = new Set(); const rec = [];
+  for (let i = 0; i < 21 && rec.length < 8; i++){
+    const dd = logs.get(addDays(curDate, -i)); if (!dd) continue;
+    for (const e of [...dd.entries].reverse()){ if (rec.length >= 8) break; if (!seen.has(e.foodId) && foods.has(e.foodId)){ seen.add(e.foodId); rec.push(foods.get(e.foodId)); } }
+  }
+  $("#recent").innerHTML = rec.length ? `<h3>Log again</h3><div>${rec.map(f=>`<button class="chip" data-quick="${esc(f.id)}">${esc(f.name)}</button>`).join("")}</div>` : "";
+  $("#recent").querySelectorAll("[data-quick]").forEach(b => b.onclick = () => openLog(b.dataset.quick));
+  renderPlanBox();
+  // meals
+  let html = "";
+  for (const m of MEALS){
+    const es = day.entries.filter(e => e.meal === m);
+    const mc = es.reduce((a,e) => a + (num(e.n.cal)||0), 0);
+    html += `<div class="meal"><h3><span>${m}</span><span>${es.length?fmt(mc,"")+" cal":""}</span></h3>`;
+    if (!es.length) html += `<div class="muted small" style="padding:8px 0">Nothing yet</div>`;
+    for (const e of es){
+      const amt = e.unit === "serv" ? `${fmt(e.amount,"g")} ${e.amount===1?"serving":"servings"}` : `${fmt(e.amount,"g")} ${e.unit}`;
+      const ing = (e.ingredients && e.ingredients.length) ? `<details class="ing"><summary>What was in your portion</summary><ul>${e.ingredients.map(i=>`<li>${esc(i.name)}: ${fmt(i.amount,"g")} ${esc(unitWord(i.unit,i.amount))}</li>`).join("")}</ul></details>` : "";
+      html += `<div class="entry"><div class="grow"><div class="nm">${esc(e.name)}</div><div class="muted small">${amt} (${fmt(e.mult,"g")}× label serving). P ${fmt(e.n.protein,"g")}g, C ${fmt(e.n.carbs,"g")}g, F ${fmt(e.n.fat,"g")}g</div>${ing}</div><div class="kc">${fmt(e.n.cal,"")}</div><button class="x" data-del="${esc(e.id)}" aria-label="Remove ${esc(e.name)}">×</button></div>`;
+    }
+    html += `</div>`;
+  }
+  $("#meals").innerHTML = html;
+  $("#meals").querySelectorAll("[data-del]").forEach(b => b.onclick = () => {
+    const d = getDay(curDate); d.entries = d.entries.filter(e => e.id !== b.dataset.del); saveDay(curDate);
+  });
+  const agg = ingredientTotals(day.entries);
+  $("#ingBreak").innerHTML = agg.length ? `<h3 style="border-bottom:5px solid var(--line);padding-bottom:4px">Everything you had, by ingredient</h3>
+    <div class="tablewrap"><table class="t"><tbody>${agg.map(a=>`<tr><td>${esc(a.name)}</td><td style="text-align:right;white-space:nowrap">${fmt(a.amount,"g")} ${esc(unitWord(a.unit,a.amount))}</td></tr>`).join("")}</tbody></table></div>` : "";
+}
+
+/* ---------- suggest the rest of the day (Claude picks, app does the math) ---------- */
+let planState = null; let planCtl = null;
+function renderPlanBox(){
+  const box = $("#planBox");
+  if (!hasKey || foods.size < 2){ box.innerHTML = ""; return; }
+  const P = planState && planState.date === curDate ? planState : null;
+  let h = `<div class="row" style="margin-top:14px"><button class="btn hi grow" id="planBtn" ${P&&P.loading?"disabled":""}>Suggest the rest of today from my foods</button>${P&&P.loading?`<button class="btn ghost" id="planStop">Stop</button>`:""}</div>`;
+  if (P && P.loading) h += `<p class="muted small">Picking from your saved foods…</p>`;
+  if (P && P.error) h += `<div class="note warn">${esc(P.error)}</div>`;
+  if (P && P.items){
+    const tot = sumN(P.items.map(i => i.n));
+    const cmp = (k,l,u) => `<tr><td>${l}</td><td class="tnum">${fmt(tot[k],u)}${u}</td><td class="tnum">${fmt(P.rem[k],u)}${u}</td></tr>`;
+    h += `<div class="card"><h3>Suggested from your saved foods</h3>
+      ${P.items.map(i=>`<div class="entry"><div class="grow"><div class="nm">${esc(i.name)}</div><div class="muted small">${i.meal}, ${fmt(i.servings,"g")} ${i.servings===1?"serving":"servings"}</div></div><div class="kc">${fmt(i.n.cal,"")}</div></div>`).join("")}
+      <div class="tablewrap"><table class="t" style="margin-top:8px"><thead><tr><th></th><th>This plan</th><th>Left today</th></tr></thead><tbody>${cmp("cal","Calories","")}${cmp("protein","Protein","g")}${cmp("carbs","Carbs","g")}${cmp("fat","Fat","g")}</tbody></table></div>
+      ${Math.abs(tot.cal - P.rem.cal) > P.rem.cal*0.15 ? `<div class="note warn">This plan is ${fmt(Math.abs(tot.cal - P.rem.cal),"")} cal ${tot.cal < P.rem.cal ? "short of" : "over"} what's left. Saving more foods gives it more to work with.</div>` : ""}
+      <p class="muted small">Totals are calculated by the app from your saved labels.${P.why?` Claude's note: ${esc(P.why)}`:""}</p>
+      <div class="row"><button class="btn" id="planLog">Log all of these</button><button class="btn ghost" id="planX">Dismiss</button></div></div>`;
+  }
+  box.innerHTML = h;
+  $("#planBtn").onclick = suggestDay;
+  const st = $("#planStop"); if (st) st.onclick = () => planCtl && planCtl.abort();
+  const lg = $("#planLog"); if (lg) lg.onclick = () => {
+    const d = getDay(curDate);
+    for (const i of P.items){ const f = foods.get(i.foodId); if (!f) continue;
+      const e = {id:uid6(), meal:i.meal, foodId:f.id, name:f.name, amount:i.servings, unit:"serv", mult:i.servings, n:scaleN(f.n, i.servings)};
+      const ings = recipeIngredientsFor(f, i.servings); if (ings) e.ingredients = ings;
+      const ex = scaleExtra(f.extra, i.servings); if (ex.length) e.extra = ex;
+      d.entries.push(e); }
+    planState = null; saveDay(curDate); toast("Logged the plan");
+  };
+  const x = $("#planX"); if (x) x.onclick = () => { planState = null; renderPlanBox(); };
+}
+async function suggestDay(){
+  const date = curDate; const T = targetsFor(date);
+  if (!num(T.cal) || !num(T.protein)){ planState = {date, error:"Set calorie and protein targets first (Plan tab)."}; renderPlanBox(); return; }
+  const day = logs.get(date) || {entries:[]}; const t = sumN(day.entries.map(e => e.n));
+  const rem = {cal:T.cal - t.cal, protein:(T.protein||0) - t.protein, carbs:(T.carbs||0) - t.carbs, fat:(T.fat||0) - t.fat};
+  for (const k in rem) rem[k] = Math.max(0, rem[k]);
+  if (rem.cal < 150){ planState = {date, error:"You're within 150 calories of today's target already."}; renderPlanBox(); return; }
+  const list = [...foods.values()].filter(f => num(f.n.cal) !== null).slice(0, 80);
+  const keyed = list.map((f,i) => ({key:"f"+i, f}));
+  const r1 = v => num(v) === null ? "?" : Math.round(v*10)/10;
+  const lines = keyed.map(({key,f}) => `${key} | ${f.name.replace(/\|/g,"/")} | per serving: ${r1(f.n.cal)} cal, ${r1(f.n.protein)} g protein, ${r1(f.n.carbs)} g carbs, ${r1(f.n.fat)} g fat`).join("\n");
+  const open = MEALS.filter(m => !day.entries.some(e => e.meal === m));
+  const prompt = `Plan the rest of one person's day of eating using ONLY foods from their saved list below.
+Still left to eat today: ${Math.round(rem.cal)} calories, ${Math.round(rem.protein)} g protein, ${Math.round(rem.carbs)} g carbs, ${Math.round(rem.fat)} g fat.
+Meals with nothing logged yet: ${open.length ? open.join(", ") : "none (use Snacks)"}.
+Rules:
+- Use only keys from the list. Never invent a food.
+- Servings must be multiples of 0.25, from 0.25 to 4. Use at most 6 items.
+- Land calories within about 5% of what's left without going over by more than 5%. Then get protein as close as possible, then carbs, then fat.
+- Put items in sensible meals from: ${MEALS.join(", ")}.
+Reply with only JSON: {"items":[{"key":"f0","servings":1,"meal":"Dinner"}],"why":"one short sentence on the main tradeoff"}
+Saved foods:
+${lines}`;
+  const tok = {aborted:false};
+  planCtl = {abort(){ tok.aborted = true; planState = null; renderPlanBox(); }};
+  planState = {date, loading:true}; renderPlanBox();
+  try {
+    const r = await gs("llSuggestPlan", prompt);
+    if (tok.aborted) return;
+    const map = Object.fromEntries(keyed.map(x => [x.key, x.f]));
+    const items = (r && Array.isArray(r.items) ? r.items : []).filter(i => i && map[i.key]).slice(0, 6).map(i => {
+      const f = map[i.key]; let sv = Math.round((num(i.servings) || 1) * 4) / 4; sv = Math.min(4, Math.max(0.25, sv));
+      return {foodId:f.id, name:f.name, servings:sv, meal: MEALS.includes(i.meal) ? i.meal : "Snacks", n:scaleN(f.n, sv)};
+    });
+    if (!items.length) throw {code:"invalid_json"};
+    planState = {date, items, rem, why: r.why ? String(r.why).slice(0, 240) : ""};
+  } catch(e){
+    if (tok.aborted) return;
+    planState = {date, error: (e && e.code === "invalid_json") ? "Couldn't build a plan from your foods. Try again." : apiError(e, "plan")};
+  } finally { planCtl = null; if (curTab === "today") renderPlanBox(); }
+}
+function unitWord(u, amt){ return u === "serv" ? (amt === 1 ? "serving" : "servings") : u; }
+function ingredientTotals(entries){
+  const m = new Map();
+  for (const e of entries){
+    const parts = (e.ingredients && e.ingredients.length) ? e.ingredients : [{foodId:e.foodId, name:e.name, amount:e.amount, unit:e.unit}];
+    for (let p of parts){
+      const f = p.foodId && foods.get(p.foodId);
+      if (p.unit === "serv" && f && f.kind !== "recipe" && f.serving && f.serving.size) p = {name:p.name, amount:p.amount * f.serving.size, unit:f.serving.unit};
+      const key = p.name + "|" + p.unit; const cur = m.get(key) || {name:p.name, unit:p.unit, amount:0}; cur.amount += p.amount; m.set(key, cur); }
+  }
+  return [...m.values()].sort((a,b) => a.name.localeCompare(b.name));
+}
+
+$("#dPrev").onclick = () => { curDate = addDays(curDate,-1); render(); };
+$("#dNext").onclick = () => { curDate = addDays(curDate,1); render(); };
+$("#dPick").onchange = e => { if (e.target.value){ curDate = e.target.value; render(); } };
+$("#restDay").onchange = e => { getDay(curDate).rest = e.target.checked; saveDay(curDate); };
+$("#goScan").onclick = () => show("scan");
+$("#goLog").onclick = () => show("foods");
+
+/* ---------- food form (scan / manual / edit) ---------- */
+let editingId = null;
+function foodFormHTML(f){
+  f = f || {name:"",serving:{text:"",size:null,unit:"g"},perContainer:null,n:{}};
+  const v = x => x === null || x === undefined ? "" : esc(x);
+  return `
+    <h3>${editingId ? "Edit food" : "Check the numbers, then save"}</h3>
+    <label class="f" for="ff-name">Food name</label>
+    <input type="text" id="ff-name" value="${v(f.name)}" required>
+    <label class="f" for="ff-stext">Serving size as printed</label>
+    <input type="text" id="ff-stext" value="${v(f.serving&&f.serving.text)}" placeholder="2/3 cup (55g)">
+    <div class="grid3">
+      <div><label class="f" for="ff-ssize">Serving weight</label><input type="number" step="any" min="0" id="ff-ssize" value="${v(f.serving&&f.serving.size)}"></div>
+      <div><label class="f" for="ff-sunit">Unit</label><select id="ff-sunit"><option value="g" ${f.serving&&f.serving.unit==="g"?"selected":""}>g</option><option value="ml" ${f.serving&&f.serving.unit==="ml"?"selected":""}>ml</option></select></div>
+      <div><label class="f" for="ff-per">Per container</label><input type="number" step="any" min="0" id="ff-per" value="${v(f.perContainer)}"></div>
+    </div>
+    <hr class="rule thick" style="margin-top:16px">
+    <p class="muted small">Per one label serving. Leave a box empty if the label doesn't list it.</p>
+    <div class="grid2">
+      ${NUTS.map(n => `<div><label class="f" for="ff-${n.k}">${n.l}${n.u?` (${n.u})`:""}</label><input type="number" step="any" min="0" id="ff-${n.k}" value="${v(f.n&&f.n[n.k])}"></div>`).join("")}
+    </div>
+    <label class="f" for="ff-extra">Other vitamins and minerals on the label (optional)</label>
+    <textarea id="ff-extra" rows="3" placeholder="One per line, like: Vitamin C 6 mg">${esc((f.extra||[]).map(x=>`${x.name} ${x.amount} ${x.unit}`.trim()).join("\n"))}</textarea>
+    <div id="macroCheck"></div>
+    <div class="row" style="margin-top:16px">
+      <button type="submit" class="btn">Save food</button>
+      <button type="button" class="btn hi" id="ff-savelog">Save and log it</button>
+      ${editingId ? `<button type="button" class="btn ghost" id="ff-cancel">Cancel</button>` : ""}
+    </div>`;
+}
+function readFoodForm(){
+  const n = {}; for (const {k} of NUTS) n[k] = num($("#ff-"+k).value);
+  const base = editingId && foods.get(editingId) ? clone(foods.get(editingId)) : {id:uid6(), kind:"label", created:Date.now()};
+  return Object.assign(base, {
+    name: $("#ff-name").value.trim() || "Unnamed food",
+    serving: {text:$("#ff-stext").value.trim(), size:num($("#ff-ssize").value), unit:$("#ff-sunit").value},
+    perContainer: num($("#ff-per").value), n, extra: parseExtra($("#ff-extra").value)
+  });
+}
+function parseExtra(text){
+  const out = [];
+  for (const line of String(text||"").split(/\n+/)){
+    const m = line.trim().match(/^(.+?)\s+([\d.]+)\s*([a-zA-Zµ]+)?\s*$/);
+    if (m && num(m[2]) !== null) out.push({name:m[1].trim(), amount:num(m[2]), unit:(m[3]||"").replace("µg","mcg")});
+  }
+  return out;
+}
+function macroCheck(){
+  const g = k => num($("#ff-"+k).value);
+  const cal = g("cal"), c = g("carbs"), p = g("protein"), f = g("fat");
+  const box = $("#macroCheck"); if (!box) return;
+  if (cal === null || c === null || p === null || f === null){ box.innerHTML = ""; return; }
+  const est = 4*c + 4*p + 9*f; const diff = Math.abs(est - cal);
+  const big = diff > Math.max(25, cal*0.2);
+  box.innerHTML = `<div class="note ${big?"warn":""}"><b>Math check:</b> 4×${c} + 4×${p} + 9×${f} = ${Math.round(est)} cal vs ${cal} printed. ${big ? "That's a big gap. Recheck the photo for a misread digit (fiber and sugar alcohols can also explain some of it)." : "Close enough; labels are rounded, so small gaps are normal."}</div>`;
+}
+function mountFoodForm(f){
+  const form = $("#foodForm"); form.innerHTML = foodFormHTML(f);
+  form.querySelectorAll("input").forEach(i => i.addEventListener("input", macroCheck));
+  macroCheck();
+  form.onsubmit = e => { e.preventDefault(); const food = readFoodForm(); saveFood(food); toast("Saved " + food.name); resetScan(); };
+  $("#ff-savelog").onclick = () => { const food = readFoodForm(); saveFood(food); resetScan(); openLog(food.id); };
+  const cancel = $("#ff-cancel"); if (cancel) cancel.onclick = () => { resetScan(); show("foods"); };
+}
+function resetScan(){
+  editingId = null; files = []; $("#photos").innerHTML = ""; $("#readMsg").textContent = ""; $("#readNotes").innerHTML = "";
+  $("#readBtn").disabled = true; $("#photo").value = ""; $("#photoLib").value = ""; $("#clearPhotos").classList.add("hidden"); $("#scanBox").classList.toggle("hidden", !hasKey); mountFoodForm();
+}
+
+/* ---------- scanning ---------- */
+let files = []; let ctl = null;
+function setupScanAvailability(){
+  const ok = hasKey;
+  $("#scanBox").classList.toggle("hidden", !ok);
+  $("#noScan").classList.toggle("hidden", ok || !cfg.url);
+}
+function drawPhotos(){
+  $("#photos").innerHTML = "";
+  for (const f of files){ const img = document.createElement("img"); img.alt = "Label photo"; img.src = URL.createObjectURL(f); $("#photos").appendChild(img); }
+  $("#readBtn").disabled = !files.length;
+  $("#clearPhotos").classList.toggle("hidden", !files.length);
+}
+function addPhotos(e){
+  const max = 2;
+  const incoming = [...e.target.files];
+  const room = max - files.length;
+  files = files.concat(incoming.slice(0, Math.max(0, room)));
+  $("#readMsg").textContent = incoming.length > room ? `Up to ${max} photos per scan. Clear photos to start over.` : (files.length < max ? "Add a photo of the front too if you want the name read, or tap Read label." : "");
+  e.target.value = "";
+  drawPhotos();
+}
+$("#photo").onchange = addPhotos;
+$("#photoLib").onchange = addPhotos;
+$("#clearPhotos").onclick = () => { files = []; $("#readMsg").textContent = ""; drawPhotos(); };
+const SCAN_PROMPT = `These photos show a packaged food. One should show its Nutrition Facts panel; another may show the front of the package.
+Report ONLY what is printed and legible in the photos. Never estimate, never fill in values from what you know about the product, and never calculate a value that isn't printed.
+- If a value is missing, cut off, blurry, or you are not sure of a digit, return null for it and explain in "notes".
+- If the panel has more than one column (for example per serving and per container), use the per-serving column and say so in notes.
+- If a nutrient is printed as "less than 1g" (or similar), return 0 for it and say so in notes.
+- product_name: only if the name is printed in the photos; otherwise null.
+- serving_size: the metric amount for one serving (the number in g or mL, usually in parentheses); serving_unit "g" or "ml".
+- Vitamin D, calcium, iron and potassium: use the printed amount (mcg or mg), not the % Daily Value. If only a percent is printed, return null and say so in notes.
+- other_nutrients: any other vitamin or mineral printed WITH an amount (for example {"name":"Vitamin C","amount":6,"unit":"mg"}). Skip ones that only show a percent, and mention them in notes.
+Reply with only this JSON object:
+{"product_name":null,"serving_text":null,"serving_size":null,"serving_unit":null,"servings_per_container":null,"calories":null,"total_fat_g":null,"saturated_fat_g":null,"trans_fat_g":null,"cholesterol_mg":null,"sodium_mg":null,"total_carbohydrate_g":null,"dietary_fiber_g":null,"total_sugars_g":null,"added_sugars_g":null,"protein_g":null,"vitamin_d_mcg":null,"calcium_mg":null,"iron_mg":null,"potassium_mg":null,"other_nutrients":[],"notes":[]}`;
+$("#readBtn").onclick = async () => {
+  if (!hasKey || !files.length) return;
+  const tok = {aborted:false};
+  ctl = {abort(){ tok.aborted = true; $("#readMsg").textContent = ""; $("#readBtn").disabled = !files.length; $("#stopBtn").classList.add("hidden"); }};
+  $("#readBtn").disabled = true; $("#stopBtn").classList.remove("hidden");
+  $("#readMsg").textContent = "Reading the label… this can take up to a minute.";
+  $("#readNotes").innerHTML = "";
+  try {
+    const imgs = await Promise.all(files.map(prepImage));
+    const r = await gs("llReadLabel", imgs, SCAN_PROMPT);
+    if (tok.aborted) return;
+    if (!r || typeof r !== "object") throw new Error("BAD_JSON");
+    const n = {}; for (const [k, key] of Object.entries(SCAN_MAP)) n[k] = num(r[key]);
+    const unit = (String(r.serving_unit||"g").toLowerCase().startsWith("m")) ? "ml" : "g";
+    const f = {name: r.product_name ? String(r.product_name) : "", serving:{text:r.serving_text?String(r.serving_text):"", size:num(r.serving_size), unit}, perContainer:num(r.servings_per_container), n};
+    f.extra = (Array.isArray(r.other_nutrients) ? r.other_nutrients : []).filter(x => x && x.name && num(x.amount) !== null).map(x => ({name:String(x.name), amount:num(x.amount), unit:String(x.unit||"")}));
+    mountFoodForm(f);
+    const missing = NUTS.filter(x => n[x.k] === null).map(x => x.l);
+    const notes = Array.isArray(r.notes) ? r.notes.filter(Boolean).map(String) : [];
+    let h = `<div class="note"><b>Read from your photo.</b> Compare each number with the label before saving. Nothing was filled in from outside the photo.`;
+    if (missing.length) h += `<br>Not found on the label: ${missing.map(esc).join(", ")}. Those boxes are empty.`;
+    if (notes.length) h += `<ul>${notes.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`;
+    h += `</div>`;
+    if (!f.serving.size) h += `<div class="note warn">No serving weight was found, so you'll only be able to log this in servings, not grams.</div>`;
+    $("#readNotes").innerHTML = h;
+    $("#readMsg").textContent = "";
+  } catch(e){
+    if (tok.aborted) return;
+    $("#readMsg").textContent = apiError(e, "read");
+  } finally {
+    if (!tok.aborted){ $("#readBtn").disabled = !files.length; $("#stopBtn").classList.add("hidden"); }
+    ctl = null;
+  }
+};
+$("#stopBtn").onclick = () => ctl && ctl.abort();
+
+/* ---------- foods list ---------- */
+function renderFoods(){
+  const q = $("#foodSearch").value.trim().toLowerCase();
+  const list = [...foods.values()].filter(f => !q || f.name.toLowerCase().includes(q)).sort((a,b) => a.name.localeCompare(b.name));
+  if (!foods.size){ $("#foodList").innerHTML = `<div class="empty">No foods yet. Scan a label on the Add tab to start.</div>`; return; }
+  $("#foodList").innerHTML = list.map(f => `
+    <div class="food"><div class="grow"><div><b>${esc(f.name)}</b>${f.kind==="recipe"?`<span class="tag">Recipe</span>`:""}</div>
+      <div class="muted small">${fmt(f.n.cal,"")} cal per ${f.kind==="recipe"?"serving":esc(f.serving.text||"serving")}${f.serving.size?` (${fmt(f.serving.size,"g")} ${f.serving.unit})`:""}. P ${fmt(f.n.protein,"g")}g, C ${fmt(f.n.carbs,"g")}g, F ${fmt(f.n.fat,"g")}g</div></div>
+      <button class="btn sm" data-log="${esc(f.id)}">Log</button>
+      <button class="btn ghost sm" data-edit="${esc(f.id)}">Edit</button>
+      <button class="x" data-rm="${esc(f.id)}" aria-label="Delete ${esc(f.name)}">×</button></div>`).join("") || `<div class="empty">No foods match "${esc(q)}".</div>`;
+  $("#foodList").querySelectorAll("[data-log]").forEach(b => b.onclick = () => openLog(b.dataset.log));
+  $("#foodList").querySelectorAll("[data-edit]").forEach(b => b.onclick = () => {
+    const f = foods.get(b.dataset.edit); if (!f) return;
+    if (f.kind === "recipe"){ openRecipe(f); return; }
+    editingId = f.id; show("scan"); $("#scanBox").classList.add("hidden"); mountFoodForm(f);
+  });
+  $("#foodList").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => {
+    const f = foods.get(b.dataset.rm); if (f && confirm(`Delete "${f.name}"? Past log entries keep their numbers.`)) deleteFood(f.id);
+  });
+}
+$("#foodSearch").oninput = renderFoods;
+
+/* ---------- log dialog ---------- */
+function multFor(food, amount, unit){
+  if (unit === "serv") return amount;
+  return food.serving && food.serving.size ? amount / food.serving.size : null;
+}
+function recipeIngredientsFor(food, mult){
+  if (food.kind !== "recipe" || !food.ingredients) return null;
+  return food.ingredients.map(i => ({foodId:i.foodId, name:i.name, amount:i.amount / food.yield * mult, unit:i.unit}));
+}
+function openLog(foodId){
+  const food = foods.get(foodId); if (!food) return;
+  const canWeigh = !!(food.serving && food.serving.size);
+  const hour = new Date().getHours();
+  const defMeal = hour < 11 ? "Breakfast" : hour < 15 ? "Lunch" : hour < 21 ? "Dinner" : "Snacks";
+  $("#logBody").innerHTML = `
+    <h2>${esc(food.name)}</h2>
+    <p class="muted small">Label serving: ${esc(food.kind==="recipe"?"1 of "+food.yield+" servings":(food.serving.text||"1 serving"))}${canWeigh?` = ${fmt(food.serving.size,"g")} ${food.serving.unit}`:""}</p>
+    <div class="grid2">
+      <div><label class="f" for="lg-amt">How much you had</label><input type="number" id="lg-amt" step="any" min="0" value="1"></div>
+      <div><label class="f" for="lg-unit">Unit</label><select id="lg-unit"><option value="serv">servings</option>${canWeigh?`<option value="${food.serving.unit}">${food.serving.unit}</option>`:""}</select></div>
+      <div><label class="f" for="lg-meal">Meal</label><select id="lg-meal">${MEALS.map(m=>`<option ${m===defMeal?"selected":""}>${m}</option>`).join("")}</select></div>
+      <div><label class="f" for="lg-date">Date</label><input type="date" id="lg-date" value="${curDate}"></div>
+    </div>
+    <div id="lg-prev" style="margin-top:12px"></div>
+    <div class="row" style="margin-top:14px"><button class="btn" id="lg-save">Log it</button><button class="btn ghost" id="lg-cancel">Cancel</button></div>`;
+  const prev = () => {
+    const amt = num($("#lg-amt").value) || 0; const unit = $("#lg-unit").value;
+    const m = multFor(food, amt, unit); const n = scaleN(food.n, m || 0);
+    const ings = recipeIngredientsFor(food, m || 0);
+    $("#lg-prev").innerHTML = `<div class="note">That's <b>${fmt(m,"g")}×</b> the label serving: <b>${fmt(n.cal,"")} cal</b>, ${fmt(n.protein,"g")}g protein, ${fmt(n.carbs,"g")}g carbs, ${fmt(n.fat,"g")}g fat.${ings?`<ul>${ings.map(i=>`<li>${esc(i.name)}: ${fmt(i.amount,"g")} ${esc(unitWord(i.unit,i.amount))}</li>`).join("")}</ul>`:""}</div>`;
+  };
+  $("#lg-amt").oninput = prev; $("#lg-unit").onchange = prev; prev();
+  $("#lg-cancel").onclick = () => $("#logDlg").close();
+  $("#lg-save").onclick = () => {
+    const amt = num($("#lg-amt").value); const unit = $("#lg-unit").value;
+    if (!amt || amt <= 0){ $("#lg-amt").focus(); return; }
+    const m = multFor(food, amt, unit); const date = $("#lg-date").value || curDate;
+    const entry = {id:uid6(), meal:$("#lg-meal").value, foodId:food.id, name:food.name, amount:amt, unit, mult:m, n:scaleN(food.n, m)};
+    const ings = recipeIngredientsFor(food, m); if (ings) entry.ingredients = ings;
+    const ex = scaleExtra(food.extra, m); if (ex.length) entry.extra = ex;
+    getDay(date).entries.push(entry); saveDay(date);
+    $("#logDlg").close(); curDate = date; toast("Logged " + food.name); show("today");
+  };
+  $("#logDlg").showModal();
+}
+
+/* ---------- recipe builder ---------- */
+let recRows = [];
+function openRecipe(existing){
+  const ingFoods = [...foods.values()].filter(f => f.kind !== "recipe" && (!existing || f.id !== existing.id)).sort((a,b)=>a.name.localeCompare(b.name));
+  if (!ingFoods.length){ toast("Save a few foods first, then build a recipe from them"); return; }
+  recRows = existing && existing.ingredients ? existing.ingredients.map(i => ({foodId:i.foodId, amount:i.amount, unit:i.unit})) : [{foodId:ingFoods[0].id, amount:1, unit:"serv"}];
+  $("#recBody").innerHTML = `
+    <h2>${existing?"Edit recipe":"Build a recipe"}</h2>
+    <label class="f" for="rc-name">Recipe name</label><input type="text" id="rc-name" value="${esc(existing?existing.name:"")}">
+    <h3>Ingredients (whole batch)</h3>
+    <div id="rc-rows"></div>
+    <button class="btn ghost sm" id="rc-add" style="margin-top:8px">Add ingredient</button>
+    <div class="grid2">
+      <div><label class="f" for="rc-yield">Servings it makes</label><input type="number" id="rc-yield" min="1" step="any" value="${existing?existing.yield:4}"></div>
+      <div><label class="f" for="rc-wt">Cooked weight, g (optional)</label><input type="number" id="rc-wt" min="0" step="any" value="${existing&&existing.totalWeight?existing.totalWeight:""}"></div>
+    </div>
+    <p class="muted small">Add the cooked weight if you want to log this recipe by grams later.</p>
+    <div id="rc-sum"></div>
+    <div class="row" style="margin-top:14px"><button class="btn" id="rc-save">Save recipe</button><button class="btn ghost" id="rc-cancel">Cancel</button></div>`;
+  const opts = sel => ingFoods.map(f => `<option value="${esc(f.id)}" ${f.id===sel?"selected":""}>${esc(f.name)}</option>`).join("");
+  const drawRows = () => {
+    $("#rc-rows").innerHTML = recRows.map((r,i) => {
+      const f = foods.get(r.foodId); const su = f && f.serving && f.serving.size ? f.serving.unit : null;
+      return `<div class="ingrow"><div><label class="f" for="rc-f${i}">Food</label><select id="rc-f${i}" data-i="${i}" data-k="foodId">${opts(r.foodId)}</select></div>
+        <div><label class="f" for="rc-a${i}">Amount</label><input type="number" step="any" min="0" id="rc-a${i}" data-i="${i}" data-k="amount" value="${r.amount}"></div>
+        <div><label class="f" for="rc-u${i}">Unit</label><select id="rc-u${i}" data-i="${i}" data-k="unit"><option value="serv">servings</option>${su?`<option value="${su}" ${r.unit===su?"selected":""}>${su}</option>`:""}</select></div>
+        <button class="x" data-rmrow="${i}" aria-label="Remove ingredient">×</button></div>`;
+    }).join("");
+    $("#rc-rows").querySelectorAll("[data-k]").forEach(el => el.onchange = el.oninput = () => {
+      const r = recRows[el.dataset.i]; const k = el.dataset.k;
+      r[k] = k === "amount" ? (num(el.value)||0) : el.value;
+      if (k === "foodId"){ r.unit = "serv"; drawRows(); } else summary();
+    });
+    $("#rc-rows").querySelectorAll("[data-rmrow]").forEach(b => b.onclick = () => { recRows.splice(+b.dataset.rmrow,1); drawRows(); });
+    summary();
+  };
+  const compute = () => {
+    const yld = num($("#rc-yield").value) || 1;
+    const parts = []; let bad = [];
+    for (const r of recRows){ const f = foods.get(r.foodId); if (!f) continue;
+      const unit = (r.unit === "serv" || (f.serving && f.serving.size)) ? r.unit : "serv";
+      const m = multFor(f, r.amount, unit); if (m === null){ bad.push(f.name); continue; }
+      parts.push({foodId:f.id, name:f.name, amount:r.amount, unit, mult:m, n:scaleN(f.n, m), extra:scaleExtra(f.extra, m)}); }
+    const total = sumN(parts.map(p => p.n)); const per = scaleN(total, 1/yld);
+    const extra = scaleExtra(sumExtra(parts.map(p => p.extra)), 1/yld);
+    return {parts, total, per, yld, bad, extra};
+  };
+  const summary = () => {
+    const c = compute();
+    $("#rc-sum").innerHTML = `<div class="note">Whole batch: <b>${fmt(c.total.cal,"")} cal</b>, ${fmt(c.total.protein,"g")}g protein.<br>Per serving (÷ ${fmt(c.yld,"g")}): <b>${fmt(c.per.cal,"")} cal</b>, ${fmt(c.per.protein,"g")}g protein, ${fmt(c.per.carbs,"g")}g carbs, ${fmt(c.per.fat,"g")}g fat.${c.bad.length?`<br><span class="over-t">Skipped (no serving weight on file): ${c.bad.map(esc).join(", ")}</span>`:""}</div>`;
+  };
+  $("#rc-yield").oninput = summary;
+  $("#rc-add").onclick = () => { recRows.push({foodId:ingFoods[0].id, amount:1, unit:"serv"}); drawRows(); };
+  $("#rc-cancel").onclick = () => $("#recDlg").close();
+  $("#rc-save").onclick = () => {
+    const c = compute(); const name = $("#rc-name").value.trim();
+    if (!name){ $("#rc-name").focus(); return; }
+    if (!c.parts.length){ toast("Add at least one ingredient"); return; }
+    const wt = num($("#rc-wt").value);
+    const food = {id: existing ? existing.id : uid6(), kind:"recipe", created: existing ? existing.created : Date.now(), name,
+      serving:{text:"1 serving", size: wt ? wt / c.yld : null, unit:"g"}, perContainer:c.yld, yield:c.yld, totalWeight:wt,
+      n:c.per, extra:c.extra, ingredients:c.parts.map(p => ({foodId:p.foodId, name:p.name, amount:p.amount, unit:p.unit}))};
+    saveFood(food); $("#recDlg").close(); toast("Saved " + name);
+  };
+  drawRows();
+  $("#recDlg").showModal();
+}
+$("#newRecipe").onclick = () => openRecipe(null);
+
+/* ---------- progress ---------- */
+let range = 7;
+$("#rangeSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+  range = +b.dataset.r; $("#rangeSeg").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); renderProgress();
+});
+function barChart(vals, labels, goalVals, unit){
+  const W = 340, H = 170, pl = 34, pb = 22, pt = 10;
+  const max = Math.max(1, ...vals, ...goalVals.filter(Boolean)) * 1.1;
+  const bw = (W - pl - 6) / vals.length;
+  const y = v => pt + (H - pt - pb) * (1 - v / max);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bar chart"><g font-family="inherit" font-size="9" fill="var(--sub)">`;
+  for (const t of [0, max/2/1.1, max/1.1]){ s += `<line x1="${pl}" x2="${W}" y1="${y(t)}" y2="${y(t)}" stroke="var(--soft)"/><text x="${pl-4}" y="${y(t)+3}" text-anchor="end">${Math.round(t)}</text>`; }
+  vals.forEach((v,i) => {
+    const x = pl + i*bw + bw*0.15, w = bw*0.7, g = goalVals[i];
+    const over = g && v > g;
+    if (v > 0) s += `<rect x="${x}" y="${y(v)}" width="${w}" height="${H-pb-y(v)}" fill="${over?"var(--over)":"var(--ink)"}"><title>${labels[i]}: ${Math.round(v)}${unit}</title></rect>`;
+    if (g) s += `<line x1="${x-bw*0.12}" x2="${x+w+bw*0.12}" y1="${y(g)}" y2="${y(g)}" stroke="var(--hi)" stroke-width="3"/>`;
+    const every = vals.length > 14 ? 5 : vals.length > 7 ? 2 : 1;
+    if (i % every === 0 || i === vals.length-1) s += `<text x="${x+w/2}" y="${H-6}" text-anchor="middle">${labels[i]}</text>`;
+  });
+  return s + `</g></svg><p class="muted small">Bars are what you ate. Yellow marks are your goal.</p>`;
+}
+function renderProgress(){
+  const days = []; for (let i = range-1; i >= 0; i--) days.push(addDays(today(), -i));
+  const tots = days.map(d => sumN((logs.get(d)||{entries:[]}).entries.map(e => e.n)));
+  const lbl = days.map(d => { const z = new Date(d+"T12:00:00"); return (z.getMonth()+1)+"/"+z.getDate(); });
+  $("#calChart").innerHTML = barChart(tots.map(t=>t.cal), lbl, days.map(d => num(targetsFor(d).cal)), " cal");
+  $("#proChart").innerHTML = barChart(tots.map(t=>t.protein), lbl, days.map(d => num(targetsFor(d).protein)), " g");
+  const logged = days.map((d,i) => ({d, t:tots[i], has:(logs.get(d)||{entries:[]}).entries.length>0})).filter(x => x.has);
+  if (!logged.length){ $("#avgTable").innerHTML = `<div class="empty">Log a few days of food to see averages here.</div>`; }
+  else {
+    const avg = k => logged.reduce((a,x)=>a+x.t[k],0)/logged.length;
+    const g = {}; for (const k of ["cal","protein","carbs","fat"]){ const v = logged.map(x => num(targetsFor(x.d)[k])).filter(z => z !== null); g[k] = v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; }
+    const row = (l,k,u,goal) => `<tr><td>${l}</td><td>${fmt(avg(k),u)}${u==="g"?" g":u==="mg"?" mg":""}</td><td>${num(goal)?fmt(goal,u)+(u==="g"?" g":""):"–"}</td></tr>`;
+    $("#avgTable").innerHTML = `<table class="t"><thead><tr><th>${logged.length} of ${range} days logged</th><th>Average</th><th>Avg target</th></tr></thead><tbody>
+      ${row("Calories","cal","",g.cal)}${row("Protein","protein","g",g.protein)}${row("Carbs","carbs","g",g.carbs)}${row("Fat","fat","g",g.fat)}${row("Fiber","fiber","g",null)}${row("Sodium","sodium","mg",null)}</tbody></table>`;
+  }
+  // weight
+  if (!$("#wDate").value) $("#wDate").value = today();
+  const ws = [...(profile.weights||[])].sort((a,b)=>a.date.localeCompare(b.date));
+  if (ws.length < 1){ $("#wChart").innerHTML = `<div class="empty">Add weigh-ins to see your trend${num(profile.goals.weightGoal)?` toward ${profile.goals.weightGoal} lb`:""}.</div>`; $("#wList").innerHTML = ""; return; }
+  const W = 340, H = 160, pl = 34, pb = 20, pt = 10;
+  const goal = num(profile.goals.weightGoal);
+  const vals = ws.map(w=>w.lb).concat(goal?[goal]:[]);
+  const lo = Math.min(...vals) - 2, hi = Math.max(...vals) + 2;
+  const t0 = new Date(ws[0].date).getTime(), t1 = Math.max(t0 + 864e5, new Date(ws[ws.length-1].date).getTime());
+  const X = d => pl + (W - pl - 8) * ((new Date(d).getTime() - t0) / (t1 - t0));
+  const Y = v => pt + (H - pt - pb) * (1 - (v - lo) / (hi - lo));
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weight trend"><g font-size="9" fill="var(--sub)">`;
+  for (const t of [lo, (lo+hi)/2, hi]) s += `<line x1="${pl}" x2="${W}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--soft)"/><text x="${pl-4}" y="${Y(t)+3}" text-anchor="end">${Math.round(t)}</text>`;
+  if (goal) s += `<line x1="${pl}" x2="${W}" y1="${Y(goal)}" y2="${Y(goal)}" stroke="var(--hi)" stroke-width="3"/><text x="${W-2}" y="${Y(goal)-4}" text-anchor="end" fill="var(--ink)">Goal ${goal}</text>`;
+  s += `<polyline fill="none" stroke="var(--ink)" stroke-width="2.5" points="${ws.map(w=>X(w.date)+","+Y(w.lb)).join(" ")}"/>`;
+  ws.forEach(w => s += `<circle cx="${X(w.date)}" cy="${Y(w.lb)}" r="3.5" fill="var(--ink)"><title>${w.date}: ${w.lb} lb</title></circle>`);
+  s += `</g></svg>`;
+  $("#wChart").innerHTML = s;
+  $("#wList").innerHTML = `<div class="tablewrap"><table class="t"><tbody>${ws.slice().reverse().slice(0,8).map(w=>`<tr><td>${prettyDate(w.date)}</td><td>${w.lb} lb</td><td style="text-align:right"><button class="x" data-wrm="${w.date}" aria-label="Delete weigh-in">×</button></td></tr>`).join("")}</tbody></table></div>`;
+  $("#wList").querySelectorAll("[data-wrm]").forEach(b => b.onclick = () => { profile.weights = profile.weights.filter(w => w.date !== b.dataset.wrm); saveProfile(); renderProgress(); });
+}
+$("#wSave").onclick = () => {
+  const d = $("#wDate").value, v = num($("#wVal").value);
+  if (!d || !v){ $("#wVal").focus(); return; }
+  profile.weights = (profile.weights||[]).filter(w => w.date !== d).concat([{date:d, lb:v}]);
+  saveProfile(); $("#wVal").value = ""; toast("Weigh-in saved"); renderProgress();
+};
+
+/* ---------- goals ---------- */
+function renderGoals(){
+  const g = profile.goals; const v = x => x === null || x === undefined ? "" : x;
+  if ($("#goalForm").contains(document.activeElement)) return;
+  $("#goalForm").innerHTML = `
+    <div class="grid2">
+      <div><label class="f" for="g-cal">Calories</label><input type="number" id="g-cal" value="${v(g.cal)}"></div>
+      <div><label class="f" for="g-rest">Rest-day calories</label><input type="number" id="g-rest" value="${v(g.restCal)}" placeholder="Same as above"></div>
+      <div><label class="f" for="g-pro">Protein (g)</label><input type="number" id="g-pro" value="${v(g.protein)}"></div>
+      <div><label class="f" for="g-carb">Carbs (g)</label><input type="number" id="g-carb" value="${v(g.carbs)}"></div>
+      <div><label class="f" for="g-fat">Fat (g)</label><input type="number" id="g-fat" value="${v(g.fat)}"></div>
+      <div><label class="f" for="g-wt">Goal weight (lb)</label><input type="number" id="g-wt" step="0.1" value="${v(g.weightGoal)}"></div>
+    </div>
+    <div id="g-split" class="muted small" style="margin-top:8px"></div>
+    <button class="btn" style="margin-top:12px" type="submit">Save goals</button>`;
+  const split = () => { const p = num($("#g-pro").value)||0, c = num($("#g-carb").value)||0, f = num($("#g-fat").value)||0; const tot = 4*p+4*c+9*f;
+    $("#g-split").textContent = tot ? `These macros add up to ${Math.round(tot).toLocaleString()} cal: ${Math.round(4*c/tot*100)}% carbs, ${Math.round(9*f/tot*100)}% fat, ${Math.round(4*p/tot*100)}% protein.` : ""; };
+  $("#goalForm").querySelectorAll("input").forEach(i => i.oninput = split); split();
+  $("#goalForm").onsubmit = e => { e.preventDefault();
+    profile.goals = {cal:num($("#g-cal").value), restCal:num($("#g-rest").value), protein:num($("#g-pro").value), carbs:num($("#g-carb").value), fat:num($("#g-fat").value), weightGoal:num($("#g-wt").value)};
+    saveProfile(); document.activeElement.blur(); toast("Goals saved"); };
+}
+
+/* ---------- training blocks ---------- */
+function latestWeight(){ const ws = [...(profile.weights||[])].sort((a,b)=>a.date.localeCompare(b.date)); return ws.length ? ws[ws.length-1].lb : null; }
+function computeBlock(i){
+  const kg = i.weightLb / 2.20462; const G = GOALS[i.goal]; const L = LOADS[i.load];
+  const sign = i.goal === "gain" ? 1 : i.goal === "lose" ? -1 : 0;
+  const weeklyLb = sign * i.weightLb * i.ratePct / 100;
+  const adj = weeklyLb * 3500 / 7;
+  const cal = Math.round((i.maintenance + adj) / 10) * 10;
+  const protein = Math.round(kg * i.proteinPerKg);
+  const fat = Math.round(cal * i.fatPct / 100 / 9);
+  const carbs = Math.max(0, Math.round((cal - protein*4 - fat*9) / 4));
+  const cpk = carbs / kg;
+  const restCarbs = Math.min(carbs, Math.round(kg * i.restCarbsPerKg));
+  const restCal = cal - (carbs - restCarbs) * 4;
+  const checks = [
+    {ok: i.proteinPerKg >= G.plo && i.proteinPerKg <= G.phi, t:`Protein ${i.proteinPerKg} g/kg = ${protein} g. Range for this goal: ${G.plo}–${G.phi} g/kg.`, src:"issn"},
+    {ok: cpk >= L.lo && cpk <= L.hi, t:`Carbs work out to ${cpk.toFixed(1)} g/kg = ${carbs} g. Range for ${L.l.split(":")[0].toLowerCase()} training: ${L.lo}–${L.hi} g/kg.` + (cpk < L.lo ? " That's below the range: raise calories, lower fat %, or lower protein toward the bottom of its range." : cpk > L.hi ? " That's above the range, which is fine if you're performing well; you could shift some to fat." : ""), src:"acsm"},
+    {ok: i.fatPct >= 20 && i.fatPct <= 35, t:`Fat ${i.fatPct}% of calories = ${fat} g. Range: 20–35%.`, src:"acsm"}
+  ];
+  if (sign) checks.push({ok: i.ratePct >= G.lo && i.ratePct <= G.hi, t:`${sign>0?"Gaining":"Losing"} ${i.ratePct}% of body weight a week ≈ ${Math.abs(weeklyLb).toFixed(2)} lb, so ${sign>0?"+":"−"}${Math.abs(Math.round(adj))} cal/day vs maintenance (3,500 cal per lb is a rough rule). Range: ${G.lo}–${G.hi}% a week.`, src:G.src});
+  return {kg, weeklyLb, adj:Math.round(adj), checks, targets:{cal, protein, carbs, fat, restCal, restCarbs}};
+}
+function blockFeedback(b){
+  const end = b.end < today() ? b.end : today();
+  if (end < b.start) return null;
+  const ws = (profile.weights||[]).filter(w => w.date >= b.start && w.date <= end).sort((x,y)=>x.date.localeCompare(y.date));
+  const cals = []; for (let d = b.start, n = 0; d <= end && n < 400; d = addDays(d,1), n++){ const day = logs.get(d); if (day && day.entries.length) cals.push(sumN(day.entries.map(e=>e.n)).cal); }
+  const avgCal = cals.length ? cals.reduce((a,c)=>a+c,0)/cals.length : null;
+  const out = {avgCal, nDays:cals.length};
+  if (ws.length < 3 || daysBetween(ws[0].date, ws[ws.length-1].date) < 10){ out.msg = "Add at least 3 weigh-ins spread over 10+ days in this block to check your rate of change."; return out; }
+  const xs = ws.map(w => daysBetween(ws[0].date, w.date)), ys = ws.map(w => w.lb);
+  const mx = xs.reduce((a,c)=>a+c,0)/xs.length, my = ys.reduce((a,c)=>a+c,0)/ys.length;
+  const slope = xs.reduce((a,x,k)=>a+(x-mx)*(ys[k]-my),0) / xs.reduce((a,x)=>a+(x-mx)**2,0);
+  out.actual = slope * 7; out.target = computeBlock(b.inputs).weeklyLb;
+  out.change = Math.round((out.target - out.actual) * 500 / 50) * 50;
+  return out;
+}
+function renderBlocks(){
+  const bl = [...(profile.blocks||[])].sort((a,b)=>b.start.localeCompare(a.start));
+  if (!bl.length){ $("#blockList").innerHTML = `<div class="empty">No blocks yet. Plan one to get calorie and macro targets matched to that phase of training.</div>`; return; }
+  const td = today();
+  $("#blockList").innerHTML = bl.map(b => {
+    const T = b.targets; const now = b.start <= td && td <= b.end;
+    const fb = blockFeedback(b);
+    let fh = "";
+    if (fb){
+      if (fb.avgCal !== null) fh += `<p class="small">Logged ${fb.nDays} ${fb.nDays===1?"day":"days"} so far, averaging <b>${fmt(fb.avgCal,"")} cal</b> vs a ${fmt(T.cal,"")} target.</p>`;
+      if (fb.msg) fh += `<p class="muted small">${fb.msg}</p>`;
+      else {
+        const off = fb.avgCal !== null && Math.abs(fb.avgCal - T.cal) > 200;
+        fh += `<p class="small">Weight trend: <b>${fb.actual>=0?"+":""}${fb.actual.toFixed(2)} lb/week</b> vs a planned ${fb.target>=0?"+":""}${fb.target.toFixed(2)}.</p>`;
+        if (off) fh += `<div class="note">You're averaging more than 200 cal away from the target, so hitting the target for a couple of weeks will tell you more than changing it.</div>`;
+        else if (Math.abs(fb.change) < 100) fh += `<div class="note">On track. No change needed.</div>`;
+        else fh += `<div class="note">To match the planned rate, ${fb.change>0?"add":"cut"} about <b>${Math.abs(fb.change)} cal/day</b> (0.1 lb/week ≈ 50 cal/day by the 3,500-cal rule ${srcLink("helms")}). <button class="btn sm" data-apply="${esc(b.id)}" data-chg="${fb.change}" style="margin-top:6px">Apply to this block</button></div>`;
+      }
+    }
+    return `<div class="card"><h3>${esc(b.name)}${now?`<span class="tag">Now</span>`:""}</h3>
+      <div class="muted small">${prettyDate(b.start)} to ${prettyDate(b.end)}. ${esc(b.inputs.focus)}, ${GOALS[b.inputs.goal].l.toLowerCase()}.</div>
+      <table class="t" style="margin-top:8px"><thead><tr><th></th><th>Calories</th><th>Protein</th><th>Carbs</th><th>Fat</th></tr></thead><tbody>
+      <tr><td>Training day</td><td class="tnum">${fmt(T.cal,"")}</td><td class="tnum">${T.protein} g</td><td class="tnum">${T.carbs} g</td><td class="tnum">${T.fat} g</td></tr>
+      <tr><td>Rest day</td><td class="tnum">${fmt(T.restCal,"")}</td><td class="tnum">${T.protein} g</td><td class="tnum">${T.restCarbs} g</td><td class="tnum">${T.fat} g</td></tr></tbody></table>
+      ${fh}
+      <div class="row" style="margin-top:8px"><button class="btn ghost sm" data-bedit="${esc(b.id)}">Edit</button><button class="btn danger sm" data-bdel="${esc(b.id)}">Delete</button></div></div>`;
+  }).join("");
+  $("#blockList").querySelectorAll("[data-bedit]").forEach(x => x.onclick = () => openBlock(profile.blocks.find(b => b.id === x.dataset.bedit)));
+  $("#blockList").querySelectorAll("[data-bdel]").forEach(x => x.onclick = () => { const b = profile.blocks.find(z => z.id === x.dataset.bdel); if (b && confirm(`Delete "${b.name}"?`)){ profile.blocks = profile.blocks.filter(z => z.id !== b.id); saveProfile(); render(); } });
+  $("#blockList").querySelectorAll("[data-apply]").forEach(x => x.onclick = () => {
+    const b = profile.blocks.find(z => z.id === x.dataset.apply); if (!b) return;
+    b.inputs.maintenance += Number(x.dataset.chg); const c = computeBlock(b.inputs); b.targets = c.targets;
+    saveProfile(); toast("Block updated. Re-check in 2 weeks."); render();
+  });
+}
+function openBlock(existing){
+  const td = today(); const w = latestWeight() || profile.goals.weightGoal || 180;
+  const i = existing ? clone(existing.inputs) : {name:"", start:td, end:addDays(td, 41), focus:FOCI[0], goal:"maintain", weightLb:w, maintenance:profile.goals.cal || 2500, ratePct:0, load:"high", proteinPerKg:2.0, fatPct:25, restCarbsPerKg:4};
+  if (existing){ i.name = existing.name; i.start = existing.start; i.end = existing.end; }
+  const opt = (obj, sel) => Object.entries(obj).map(([k,v]) => `<option value="${k}" ${k===sel?"selected":""}>${v.l}</option>`).join("");
+  $("#blkBody").innerHTML = `
+    <h2>${existing?"Edit training block":"Plan a training block"}</h2>
+    <label class="f" for="b-name">Block name</label><input type="text" id="b-name" value="${esc(i.name)}" placeholder="Strength block 1">
+    <div class="grid2">
+      <div><label class="f" for="b-start">Starts</label><input type="date" id="b-start" value="${i.start}"></div>
+      <div><label class="f" for="b-end">Ends</label><input type="date" id="b-end" value="${i.end}"></div>
+      <div><label class="f" for="b-focus">Training focus</label><select id="b-focus">${FOCI.map(f=>`<option ${f===i.focus?"selected":""}>${esc(f)}</option>`).join("")}</select></div>
+      <div><label class="f" for="b-goal">Body weight goal</label><select id="b-goal">${opt(GOALS, i.goal)}</select></div>
+      <div><label class="f" for="b-wt">Current weight (lb)</label><input type="number" id="b-wt" step="0.1" value="${i.weightLb}"></div>
+      <div><label class="f" for="b-maint">Maintenance calories</label><input type="number" id="b-maint" step="10" value="${i.maintenance}"></div>
+    </div>
+    <p class="muted small">Maintenance = what you eat while your weight holds steady. If you're not sure, start with your current intake; the block will tell you how far off it is after 2 weeks of weigh-ins.</p>
+    <label class="f" for="b-load">Training load during this block</label><select id="b-load">${opt(LOADS, i.load)}</select>
+    <div class="grid3">
+      <div><label class="f" for="b-rate">% body wt / week</label><input type="number" id="b-rate" step="0.05" min="0" value="${i.ratePct}"></div>
+      <div><label class="f" for="b-pro">Protein g/kg</label><input type="number" id="b-pro" step="0.1" min="0" value="${i.proteinPerKg}"></div>
+      <div><label class="f" for="b-fat">Fat % cal</label><input type="number" id="b-fat" step="1" min="0" value="${i.fatPct}"></div>
+    </div>
+    <label class="f" for="b-rest">Rest-day carbs (g/kg)</label><input type="number" id="b-rest" step="0.5" min="0" value="${i.restCarbsPerKg}" style="max-width:140px">
+    <p class="muted small">Rest days drop carbs to this level (the light-training range is 3–5 g/kg ${srcLink("acsm")}); protein and fat stay the same.</p>
+    <div id="b-out"></div>
+    <div class="row" style="margin-top:14px"><button class="btn" id="b-save">Save block</button><button class="btn ghost" id="b-cancel">Cancel</button></div>`;
+  const read = () => ({focus:$("#b-focus").value, goal:$("#b-goal").value, weightLb:num($("#b-wt").value)||0, maintenance:num($("#b-maint").value)||0, ratePct:num($("#b-rate").value)||0, load:$("#b-load").value, proteinPerKg:num($("#b-pro").value)||0, fatPct:num($("#b-fat").value)||0, restCarbsPerKg:num($("#b-rest").value)||0});
+  const out = () => {
+    const v = read(); if (!v.weightLb || !v.maintenance){ $("#b-out").innerHTML = `<div class="note warn">Enter your weight and maintenance calories.</div>`; return; }
+    const c = computeBlock(v); const T = c.targets;
+    $("#b-out").innerHTML = `<div class="card"><h3>Your targets</h3>
+      <table class="t"><thead><tr><th></th><th>Calories</th><th>Protein</th><th>Carbs</th><th>Fat</th></tr></thead><tbody>
+      <tr><td>Training day</td><td class="tnum">${fmt(T.cal,"")}</td><td class="tnum">${T.protein} g</td><td class="tnum">${T.carbs} g</td><td class="tnum">${T.fat} g</td></tr>
+      <tr><td>Rest day</td><td class="tnum">${fmt(T.restCal,"")}</td><td class="tnum">${T.protein} g</td><td class="tnum">${T.restCarbs} g</td><td class="tnum">${T.fat} g</td></tr></tbody></table>
+      <h3>How each number was set</h3>
+      ${c.checks.map(k=>`<div class="chk"><span class="m ${k.ok?"ok":"no"}">${k.ok?"✓":"!"}</span><span>${k.t} ${srcLink(k.src)}</span></div>`).join("")}
+      <p class="muted small" style="margin-top:6px">Calories = maintenance ± the planned rate. Protein and fat are set from your inputs; carbs fill the rest and are then checked against the range for your training load.</p></div>`;
+  };
+  $("#b-goal").onchange = () => { const G = GOALS[$("#b-goal").value]; $("#b-rate").value = G.rate; $("#b-pro").value = G.p; out(); };
+  $("#b-focus").onchange = () => { const f = $("#b-focus").value; if (!existing) $("#b-load").value = /Endurance|Concurrent/.test(f) ? "high" : "moderate"; out(); };
+  $("#blkBody").querySelectorAll("input,select").forEach(el => { if (!el.onchange) el.addEventListener("input", out); });
+  $("#b-load").onchange = out;
+  out();
+  $("#b-cancel").onclick = () => $("#blkDlg").close();
+  $("#b-save").onclick = () => {
+    const v = read(); const name = $("#b-name").value.trim(); const st = $("#b-start").value, en = $("#b-end").value;
+    if (!name){ $("#b-name").focus(); return; }
+    if (!st || !en || en < st){ toast("Check the start and end dates"); return; }
+    if (!v.weightLb || !v.maintenance){ toast("Enter weight and maintenance calories"); return; }
+    const overlap = (profile.blocks||[]).find(b => (!existing || b.id !== existing.id) && b.start <= en && st <= b.end);
+    if (overlap && !confirm(`This overlaps "${overlap.name}". Days in both will use the block that was saved first. Save anyway?`)) return;
+    const c = computeBlock(v);
+    const blk = {id: existing ? existing.id : uid6(), name, start:st, end:en, inputs:v, targets:c.targets};
+    profile.blocks = (profile.blocks||[]).filter(b => b.id !== blk.id).concat([blk]);
+    saveProfile(); $("#blkDlg").close(); toast("Saved " + name); render();
+  };
+  $("#blkDlg").showModal();
+}
+$("#newBlock").onclick = () => openBlock(null);
+function renderSources(){
+  $("#srcList").innerHTML = Object.entries(SRC).map(([k,x]) => `<p><b>[${k.toUpperCase()}]</b> <a href="${x.u}" target="_blank" rel="noopener">${esc(x.t)}</a>. ${esc(x.w)}</p>`).join("");
+}
+
+/* ---------- start ---------- */
+mountFoodForm();
+boot();
+</script>
+</body>
+</html>
