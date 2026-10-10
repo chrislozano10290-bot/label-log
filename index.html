@@ -50,6 +50,7 @@ p{margin:6px 0}
 /* bottom nav */
 nav.tabs{position:fixed;left:0;right:0;bottom:0;background:#200F1B;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);z-index:20}
 nav.tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+nav.tabs button{font-size:.8rem}
 nav.tabs button{background:none;border:0;padding:12px 4px 13px;font-weight:700;font-size:.85rem;cursor:pointer;color:var(--sub)}
 nav.tabs button[aria-current="page"]{color:var(--acc);box-shadow:inset 0 3px 0 var(--acc)}
 
@@ -220,27 +221,35 @@ a{color:var(--acc)}
   <!-- PROGRESS -->
   <main id="v-progress" data-view class="hidden">
     <h2>Progress</h2>
+    <div class="row" id="progCat" style="margin-bottom:4px"></div>
     <div class="seg" role="group" aria-label="Range" id="rangeSeg">
       <button data-r="7" aria-pressed="true">7 days</button>
       <button data-r="14" aria-pressed="false">14 days</button>
       <button data-r="30" aria-pressed="false">30 days</button>
     </div>
-    <h3>Calories each day</h3>
-    <div class="chart" id="calChart"></div>
-    <h3>Protein each day</h3>
-    <div class="chart" id="proChart"></div>
-    <h3>Averages on days you logged</h3>
-    <div class="tablewrap" id="avgTable"></div>
-    <h3>Body weight</h3>
-    <div class="row">
-      <input type="date" id="wDate" style="max-width:170px" aria-label="Weigh-in date">
-      <input type="number" id="wVal" step="0.1" min="0" placeholder="lb" style="max-width:110px" aria-label="Weight in pounds">
-      <button class="btn" id="wSave">Save weigh-in</button>
+    <div id="foodCharts">
+      <h3>Calories each day</h3>
+      <div class="chart" id="calChart"></div>
+      <h3>Protein each day</h3>
+      <div class="chart" id="proChart"></div>
+      <h3>Averages on days you logged</h3>
+      <div class="tablewrap" id="avgTable"></div>
     </div>
-    <div class="chart" id="wChart"></div>
-    <div id="wList"></div>
+    <div id="sheetCharts"></div>
   </main>
 
+  <!-- TRAIN -->
+  <main id="v-train" data-view class="hidden">
+    <h2 id="trainHead">Training</h2>
+    <div class="seg" role="group" aria-label="Training section" id="trainSeg">
+      <button data-ts="run" aria-pressed="false">Run</button>
+      <button data-ts="strength" aria-pressed="true">Strength</button>
+      <button data-ts="stretch" aria-pressed="false">Stretch &amp; Iso</button>
+    </div>
+    <div id="trainBody"></div>
+  </main>
+
+  <!-- FOODS (reached from Add) -->
   <!-- MORE -->
   <main id="v-more" data-view class="hidden">
     <h2>App colours</h2>
@@ -296,11 +305,12 @@ a{color:var(--acc)}
   </main>
 </div>
 
+<dialog id="liftDlg"><div class="dbody"></div></dialog>
 <nav class="tabs" aria-label="Sections">
   <div class="in">
     <button data-tab="today" aria-current="page">Today</button>
+    <button data-tab="train">Train</button>
     <button data-tab="scan">Add</button>
-    <button data-tab="foods">Foods</button>
     <button data-tab="progress">Progress</button>
     <button data-tab="more">Plan</button>
   </div>
@@ -546,6 +556,222 @@ window.addEventListener("hashchange", readSetupLink);
 $("#syncBtn").onclick = () => { if (!navigator.onLine) toast(syncWords("OFFLINE")); else if (!Object.keys(outbox).length) toast("Nothing waiting to sync"); syncNow(); };
 $("#pullBtn").onclick = () => { if (confirm("Replace what's on this phone with what's in your sheet?")) pullFromSheet(false); };
 $("#cfgSave").onclick = () => connect($("#cfgUrl").value, $("#cfgTok").value);
+/* ---------- Progress charts from the sheet ---------- */
+let progCat = "food";
+const PROG_CATS = [["food","Food"],["running","Running"],["strength","Strength"],["body","Body"],["recovery","Recovery"]];
+function seriesChart(pts, opts){
+  // pts: [[label, value], ...] already in order. opts: {unit, colour, kind:"bar"|"line", goal}
+  const W = 340, H = 170, pl = 38, pb = 22, pt = 10;
+  const vals = pts.map(p => p[1]).filter(v => isFinite(v));
+  if (!vals.length) return `<div class="empty">No data yet.</div>`;
+  const lo = opts.zero === false ? Math.min(...vals) * 0.97 : 0;
+  const hi = Math.max(...vals, opts.goal || 0) * 1.08 || 1;
+  const y = v => pt + (H - pt - pb) * (1 - (v - lo) / (hi - lo || 1));
+  const n = pts.length, bw = (W - pl - 6) / n;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.label||"Chart")}"><g font-family="inherit" font-size="9" fill="var(--sub)">`;
+  for (const t of [lo, (lo+hi)/2, hi]) s += `<line x1="${pl}" x2="${W}" y1="${y(t)}" y2="${y(t)}" stroke="var(--soft)"/><text x="${pl-4}" y="${y(t)+3}" text-anchor="end">${Math.round(t)}</text>`;
+  if (opts.goal) s += `<line x1="${pl}" x2="${W}" y1="${y(opts.goal)}" y2="${y(opts.goal)}" stroke="var(--acc2)" stroke-width="2" stroke-dasharray="4 3"/>`;
+  if (opts.kind === "line"){
+    const pathPts = pts.map((p,i) => isFinite(p[1]) ? `${pl + i*bw + bw/2},${y(p[1])}` : null).filter(Boolean);
+    s += `</g><polyline fill="none" stroke="${opts.colour}" stroke-width="2.5" stroke-linejoin="round" points="${pathPts.join(" ")}"/><g font-family="inherit" font-size="9" fill="var(--sub)">`;
+    pts.forEach((p,i) => { if (isFinite(p[1])) s += `<circle cx="${pl+i*bw+bw/2}" cy="${y(p[1])}" r="2.5" fill="${opts.colour}"><title>${esc(p[0])}: ${fmt(p[1],"g")}${opts.unit||""}</title></circle>`; });
+  } else {
+    pts.forEach((p,i) => { if (!isFinite(p[1]) || p[1] <= 0) return;
+      const x = pl + i*bw + bw*0.15, w = Math.max(1, bw*0.7);
+      s += `<rect x="${x}" y="${y(p[1])}" width="${w}" height="${Math.max(0, y(lo)-y(p[1]))}" rx="2" fill="${opts.colour}"><title>${esc(p[0])}: ${fmt(p[1],"g")}${opts.unit||""}</title></rect>`; });
+  }
+  const every = n > 20 ? Math.ceil(n/7) : n > 10 ? 2 : 1;
+  pts.forEach((p,i) => { if (i % every === 0 || i === n-1) s += `<text x="${pl+i*bw+bw/2}" y="${H-6}" text-anchor="middle">${esc(String(p[0]).slice(5))}</text>`; });
+  return s + `</g></svg>`;
+}
+function weekKey(d){ const z = new Date(d + "T12:00:00"); const day = (z.getDay()+6)%7; z.setDate(z.getDate()-day); return z.toISOString().slice(0,10); }
+function renderSheetCharts(){
+  const host = $("#sheetCharts"); if (!host) return;
+  $("#progCat").innerHTML = PROG_CATS.map(([k,l]) =>
+    `<button class="chip" data-pc="${k}" ${k===progCat?`style="background:var(--acc);color:#1A0D16;border-color:var(--acc)"`:""}>${l}</button>`).join("");
+  $("#progCat").querySelectorAll("[data-pc]").forEach(b => b.onclick = () => { progCat = b.dataset.pc; renderProgress(); });
+  $("#foodCharts").classList.toggle("hidden", progCat !== "food");
+  if (progCat === "food"){ host.innerHTML = ""; return; }
+  if (!TD){ host.innerHTML = `<div class="empty">Loading your sheet data…</div>`; loadTraining(false).then(() => { if (progCat !== "food") renderProgress(); }); return; }
+  const S = TD.series, cut = addDays(today(), -(range === 7 ? 56 : range === 14 ? 120 : 400));
+  const after = rows => rows.filter(r => r[0] >= cut);
+  let h = "";
+  if (progCat === "running"){
+    const wk = {}; after(S.runs).forEach(r => { const k = weekKey(r[0]); wk[k] = (wk[k]||0) + (Number(r[1])||0); });
+    h += `<h3>Weekly mileage</h3><div class="chart">${seriesChart(Object.keys(wk).sort().map(k=>[k, Math.round(wk[k]*10)/10]), {unit:" mi", colour:"var(--acc)", kind:"bar", label:"Weekly mileage"})}</div>`;
+    const zs = {}; after(S.runs).forEach(r => { const z = r[5] || "–"; zs[z] = zs[z] || {mi:0, pace:[], cad:[]};
+      zs[z].mi += Number(r[1])||0; if (Number(r[2]) && Number(r[1])) zs[z].pace.push(Number(r[2])/Number(r[1])); if (Number(r[4])) zs[z].cad.push(Number(r[4])); });
+    const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : NaN;
+    const mmss = m => isFinite(m) ? Math.floor(m) + ":" + String(Math.round((m%1)*60)).padStart(2,"0") : "–";
+    h += `<h3>By heart-rate zone</h3><div class="tablewrap"><table class="t"><thead><tr><th>Zone</th><th>Miles</th><th>Pace</th><th>Cadence</th></tr></thead><tbody>` +
+      Object.keys(zs).sort().map(z=>`<tr><td>${esc(z)}</td><td>${fmt(Math.round(zs[z].mi*10)/10,"g")}</td><td>${mmss(avg(zs[z].pace))}</td><td>${isFinite(avg(zs[z].cad))?Math.round(avg(zs[z].cad)):"–"}</td></tr>`).join("") + `</tbody></table></div>`;
+    h += `<h3>Cadence each run</h3><div class="chart">${seriesChart(after(S.runs).filter(r=>Number(r[4])).map(r=>[r[0], Number(r[4])]), {unit:" spm", colour:"var(--carb)", kind:"line", zero:false, label:"Cadence"})}</div>`;
+  }
+  if (progCat === "strength"){
+    const MAIN = ["Squat","Deadlift","Bench","OHP"];
+    const by = {}; after(S.lifts).forEach(r => { const n = r[1]; const reps = Number(r[3]), w = Number(r[4]);
+      if (!LL_1RM[reps] || !w) return; const e = Math.round(w/(LL_1RM[reps]/100));
+      (by[n] = by[n] || []).push([r[0], e]); });
+    for (const n of MAIN) if (by[n]) h += `<h3>${esc(n)} · est. 1RM</h3><div class="chart">${seriesChart(by[n], {unit:" lb", colour:"var(--acc)", kind:"line", zero:false, label:n})}</div>`;
+    const others = Object.keys(by).filter(n => !MAIN.includes(n)).sort();
+    if (others.length) h += `<h3>Other lifts · best est. 1RM</h3><div class="tablewrap"><table class="t"><thead><tr><th>Lift</th><th>Best</th><th>Last</th></tr></thead><tbody>` +
+      others.map(n=>{ const a=by[n]; const best=Math.max(...a.map(x=>x[1])); return `<tr><td>${esc(n)}</td><td>${best} lb</td><td>${esc(a[a.length-1][0])}</td></tr>`; }).join("") + `</tbody></table></div>`;
+  }
+  if (progCat === "body"){
+    h += `<h3>Bodyweight</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[1])).map(r=>[r[0], Number(r[1])]), {unit:" lb", colour:"var(--acc)", kind:"line", zero:false, goal: num(profile.goals.weightGoal)||0, label:"Bodyweight"})}</div>`;
+    const vj = after(S.body).filter(r=>Number(r[2])).map(r=>[r[0], Number(r[2])]);
+    if (vj.length) h += `<h3>Vertical jump</h3><div class="chart">${seriesChart(vj, {unit:'"', colour:"var(--acc2)", kind:"line", zero:false, label:"Vertical jump"})}</div>`;
+    h += `<h3>Steps each day</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[3])).map(r=>[r[0], Number(r[3])]), {unit:" steps", colour:"var(--carb)", kind:"bar", label:"Steps"})}</div>`;
+    h += `<p class="muted small">Bodyweight and vertical jump are whatever you typed in Body Log. Steps come from intervals.icu.</p>`;
+  }
+  if (progCat === "recovery"){
+    h += `<h3>HRV</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[6])).map(r=>[r[0], Number(r[6])]), {unit:" ms", colour:"var(--fat)", kind:"bar", label:"HRV"})}</div>`;
+    h += `<h3>Sleep</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[4])).map(r=>[r[0], Number(r[4])]), {unit:" h", colour:"var(--acc2)", kind:"bar", label:"Sleep"})}</div>`;
+    h += `<h3>Resting heart rate</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[5])).map(r=>[r[0], Number(r[5])]), {unit:" bpm", colour:"var(--acc)", kind:"line", zero:false, label:"Resting HR"})}</div>`;
+    h += `<p class="muted small">All three come from intervals.icu, for finished days only.</p>`;
+  }
+  host.innerHTML = h;
+}
+
+/* ---------- Training ---------- */
+let TD = null, tSec = "strength", tDay = "", tLoading = false;
+const DAY_ABBR = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+function todayAbbr(){ return DAY_ABBR[new Date(curDate + "T12:00:00").getDay()]; }
+async function loadTraining(force){
+  if (TD && !force) return TD;
+  if (tLoading) return null;
+  tLoading = true; renderTrain();
+  try { TD = await remote("llGetTrainingData", [], 120000); await kvSet("training", {at: Date.now(), d: TD}); }
+  catch(e){ const c = await kvGet("training").catch(()=>null); if (c) { TD = c.d; toast("Showing your last saved plan (" + syncWords(String(e.message)) + ")"); } else toast(syncWords(String(e.message))); }
+  finally { tLoading = false; renderTrain(); }
+  return TD;
+}
+function trainStyle(kind){
+  if (kind === "plyo") return {c:"var(--acc2)", t:"Plyo"};
+  if (kind === "iso") return {c:"var(--acc2)", t:"Iso hold"};
+  if (kind === "mobility") return {c:"var(--acc2)", t:"Mobility"};
+  return {c:"var(--acc)", t:"Lift"};
+}
+function renderTrain(){
+  const host = $("#trainBody"); if (!host) return;
+  $("#trainSeg").querySelectorAll("[data-ts]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.ts === tSec)));
+  if (tLoading && !TD){ host.innerHTML = `<div class="empty">Loading your plan from the sheet…</div>`; return; }
+  if (!TD){ host.innerHTML = `<div class="empty">Couldn't load your plan yet. <button class="btn sm" id="tRetry" style="margin-top:8px">Try again</button></div>`;
+    const r = $("#tRetry"); if (r) r.onclick = () => loadTraining(true); return; }
+
+  if (tSec === "run"){
+    const g = (TD.glance || []).find(x => (x.day||"").slice(0,3) === todayAbbr()) || {};
+    const runs = (TD.series.runs || []).slice(-1)[0];
+    host.innerHTML = `
+      <div class="card">
+        <div class="small" style="color:var(--carb);font-weight:700;text-transform:uppercase;letter-spacing:.05em">${esc(todayAbbr())} AM · from your Plan tab</div>
+        <h3 style="margin:4px 0 6px">${esc(g.am || "Rest")}</h3>
+        <div class="muted small">${esc(g.note || "")}</div>
+        <div class="grid2" style="margin-top:10px">
+          <div><div class="small muted">Easy / long pace</div><div style="font-family:var(--display);font-weight:700">13:15–14:00 /mi</div></div>
+          <div><div class="small muted">Fartlek fast reps</div><div style="font-family:var(--display);font-weight:700">10:45–11:45 /mi</div></div>
+        </div>
+      </div>
+      ${runs ? `<h3>Last run · ${esc(runs[0])}</h3><div class="card"><div class="macros">
+        <div class="macro"><div class="mk">Miles</div><div class="mv">${fmt(runs[1],"g")}</div></div>
+        <div class="macro"><div class="mk">Avg HR</div><div class="mv">${fmt(runs[3],"")}</div></div>
+        <div class="macro"><div class="mk">Cadence</div><div class="mv">${fmt(runs[4],"")}</div></div>
+      </div><div class="muted small" style="margin-top:8px">Zone ${esc(String(runs[5]||"–"))} · ${esc(String(runs[6]||""))}</div></div>` : ""}
+      <p class="muted small">Runs come from intervals.icu on their own, twice a day. Nothing to log here.</p>
+      ${TD.lastImport ? `<p class="muted small">${esc(TD.lastImport)}</p>` : ""}`;
+    return;
+  }
+
+  const isStretch = tSec === "stretch";
+  const want = isStretch ? ["iso","mobility"] : ["plyo","lift"];
+  const dayKeys = Object.keys(TD.days).filter(k => (TD.days[k].items||[]).some(i => want.includes(i.kind)));
+  if (!dayKeys.length){ host.innerHTML = `<div class="empty">Nothing in this section yet.</div>`; return; }
+  if (!dayKeys.includes(tDay)) tDay = dayKeys.includes(todayAbbr()) ? todayAbbr() : dayKeys[0];
+  const day = TD.days[tDay], items = (day.items||[]).filter(i => want.includes(i.kind));
+
+  let html = `<div class="row" style="margin-top:10px">` + dayKeys.map(k =>
+    `<button class="chip" data-tday="${k}" ${k===tDay?`style="background:${isStretch?"var(--acc2)":"var(--acc)"};color:#1A0D16;border-color:${isStretch?"var(--acc2)":"var(--acc)"}"`:""}>${k}${k===todayAbbr()?" · today":""}</button>`).join("") + `</div>`;
+  html += `<h3>${esc(day.title)}</h3>`;
+  if (!isStretch) html += `<p class="muted small">Tap Log on a lift to record sets, reps and weight. It saves here first and syncs to your sheet.</p>`;
+  else html += `<p class="muted small">Reference only: iso holds near-max for 20–45 sec, mobility at the end.</p>`;
+
+  let lastBlock = "";
+  for (const it of items){
+    if (it.block !== lastBlock){
+      lastBlock = it.block;
+      const sty = trainStyle(it.kind);
+      html += `<div class="small" style="margin:14px 0 2px;color:${sty.c};font-weight:800;text-transform:uppercase;letter-spacing:.05em">${esc(it.block)}${it.notes?` <span style="color:var(--sub);font-weight:600;text-transform:none;letter-spacing:0">· ${esc(it.notes)}</span>`:""}</div>`;
+    }
+    const last = it.kind === "plyo" ? (TD.lastPlyo||{})[it.logName] : (TD.lastLift||{})[it.logName];
+    const lastTxt = !last ? "" : it.kind === "plyo"
+      ? `last: ${[last.height&&last.height+'"', last.load&&last.load+" lb", last.reps&&last.reps+" reps"].filter(Boolean).join(" · ")} (${last.date})`
+      : `last: ${fmt(last.sets,"")} × ${fmt(last.reps,"")} @ ${fmt(last.weight,"g")} lb (${last.date})`;
+    const can = !!it.logName && (it.kind === "lift" || it.kind === "plyo");
+    html += `<div class="entry"><div class="grow"><div class="nm">${esc(it.name)}</div>${lastTxt?`<div class="muted small">${esc(lastTxt)}</div>`:""}${it.superset?`<div class="muted small">superset ${esc(it.superset)}</div>`:""}</div>` +
+      (can ? `<button class="btn sm ghost" data-tlog="${esc(it.logName)}" data-tkind="${it.kind}" style="border-color:${trainStyle(it.kind).c};color:${trainStyle(it.kind).c}">Log</button>` : "") + `</div>`;
+  }
+  host.innerHTML = html;
+  host.querySelectorAll("[data-tday]").forEach(b => b.onclick = () => { tDay = b.dataset.tday; renderTrain(); });
+  host.querySelectorAll("[data-tlog]").forEach(b => b.onclick = () => openLift(b.dataset.tlog, b.dataset.tkind));
+}
+
+/* ---------- the Log box ---------- */
+function openLift(name, kind){
+  const plyo = kind === "plyo";
+  const last = plyo ? (TD.lastPlyo||{})[name] : (TD.lastLift||{})[name];
+  const f = plyo ? [["ht","Height/dist (in)", last?last.height:"" ,1],["ld","Load (lb)", last?last.load:"" ,5],["rp","Reps", last?last.reps:"" ,1]]
+                 : [["st","Sets", last?last.sets:"" ,1],["rp","Reps", last?last.reps:"" ,1],["wt","Weight (lb)", last?last.weight:"" ,5]];
+  const d = $("#liftDlg");
+  d.querySelector(".dbody").innerHTML = `
+    <h2 style="margin-bottom:2px">${esc(name)}</h2>
+    <div class="muted small">${plyo?"Saves to your Plyo Log":"Saves to your Lift Log"}${last?` · last ${esc(last.date)}`:" · no earlier entry"}</div>
+    <div class="grid3" style="margin-top:12px">${f.map(([id,lbl,v,step])=>`
+      <div><label class="f" for="lf_${id}">${lbl}</label>
+        <div class="row" style="gap:4px;flex-wrap:nowrap">
+          <button class="btn sm ghost" data-step="${id}:-${step}" aria-label="Less ${lbl}">−</button>
+          <input id="lf_${id}" type="number" step="any" inputmode="decimal" value="${v===undefined||v===null?"":v}" style="text-align:center">
+          <button class="btn sm ghost" data-step="${id}:${step}" aria-label="More ${lbl}">+</button>
+        </div></div>`).join("")}</div>
+    <label class="f" for="lf_note">Note (optional)</label>
+    <input id="lf_note" type="text" placeholder="e.g. belt on last set">
+    ${plyo?"":`<div class="note" id="lf_est" style="margin-top:12px"></div>`}
+    <div class="row" style="margin-top:14px">
+      <button class="btn ghost grow" id="lf_cancel">Cancel</button>
+      <button class="btn grow" id="lf_save" style="background:${plyo?"var(--acc2)":"var(--acc)"}">Save</button>
+    </div>`;
+  const est = () => { const e = $("#lf_est"); if (!e) return;
+    const r = Number($("#lf_rp").value), w = Number($("#lf_wt").value);
+    const pct = LL_1RM[r];
+    e.innerHTML = (w && pct) ? `Est. 1RM ≈ <b>${Math.round(w/(pct/100))} lb</b> <span class="muted small">(Strength Level table, same as your sheet)</span>` : `<span class="muted small">Est. 1RM fills in from your sheet.</span>`;
+  };
+  d.querySelectorAll("[data-step]").forEach(b => b.onclick = () => {
+    const [id, delta] = b.dataset.step.split(":"); const el = $("#lf_" + id);
+    el.value = Math.max(0, Math.round(((Number(el.value)||0) + Number(delta)) * 100) / 100); est();
+  });
+  d.querySelectorAll("input").forEach(i => i.oninput = est);
+  est();
+  $("#lf_cancel").onclick = () => d.close();
+  $("#lf_save").onclick = async () => {
+    const g = id => { const el = $("#lf_" + id); const v = el ? Number(el.value) : NaN; return isFinite(v) && el.value !== "" ? v : ""; };
+    const entry = plyo
+      ? {id:"p" + Date.now(), date: curDate, exercise: name, height: g("ht"), load: g("ld"), reps: g("rp"), notes: $("#lf_note").value}
+      : {id:"l" + Date.now(), date: curDate, exercise: name, sets: g("st"), reps: g("rp"), weight: g("wt"), notes: $("#lf_note").value};
+    if (!plyo && (entry.sets === "" || entry.reps === "" || entry.weight === "")){ toast("Fill in sets, reps and weight"); return; }
+    if (plyo && entry.reps === ""){ toast("Fill in reps"); return; }
+    enqueue((plyo?"P/":"L/") + entry.id, plyo ? "llLogPlyo" : "llLogLift", [entry]);
+    // show it as the new "last" right away
+    const store = plyo ? (TD.lastPlyo = TD.lastPlyo || {}) : (TD.lastLift = TD.lastLift || {});
+    store[name] = plyo ? {date: curDate, height: entry.height, load: entry.load, reps: entry.reps}
+                       : {date: curDate, sets: entry.sets, reps: entry.reps, weight: entry.weight};
+    await kvSet("training", {at: Date.now(), d: TD}).catch(()=>{});
+    d.close(); renderTrain();
+    toast("Saved " + name + (plyo ? "" : ` · ${entry.sets} × ${entry.reps} @ ${entry.weight} lb`));
+  };
+  d.showModal();
+}
+// Strength Level percentages, matching your sheet's _Ref table
+const LL_1RM = {1:100,2:97,3:94,4:92,5:89,6:86,7:83,8:81,9:78,10:75,11:73,12:71};
+
 /* ---------- accent colours ---------- */
 const ACC_DEFAULT = {acc:{h:338,l:65,hex:"#FF4D8D"}, acc2:{h:268,l:74,hex:"#B57BFF"}};
 let acc = JSON.parse(JSON.stringify(ACC_DEFAULT)), accTarget = "acc";
@@ -628,6 +854,7 @@ let curTab = "today";
 function show(tab){
   curTab = tab;
   document.querySelectorAll("[data-view]").forEach(v => v.classList.toggle("hidden", v.id !== "v-" + tab));
+  if (tab === "train") loadTraining(false);
   document.querySelectorAll("nav.tabs button").forEach(b => { if (b.dataset.tab === tab) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
   if (tab === "scan" && !editingId) $("#scanBox").classList.toggle("hidden", !hasKey);
   render(); window.scrollTo(0,0);
@@ -1160,6 +1387,8 @@ function barChart(vals, labels, goalVals, unit){
   return s + `</g></svg><p class="muted small">Bars are what you ate. Yellow marks are your goal.</p>`;
 }
 function renderProgress(){
+  renderSheetCharts();
+  if (progCat !== "food") return;
   const days = []; for (let i = range-1; i >= 0; i--) days.push(addDays(today(), -i));
   const tots = days.map(d => sumN((logs.get(d)||{entries:[]}).entries.map(e => e.n)));
   const lbl = days.map(d => { const z = new Date(d+"T12:00:00"); return (z.getMonth()+1)+"/"+z.getDate(); });
@@ -1175,34 +1404,7 @@ function renderProgress(){
       ${row("Calories","cal","",g.cal)}${row("Protein","protein","g",g.protein)}${row("Carbs","carbs","g",g.carbs)}${row("Fat","fat","g",g.fat)}${row("Fiber","fiber","g",null)}${row("Sodium","sodium","mg",null)}</tbody></table>`;
   }
   // weight
-  if (!$("#wDate").value) $("#wDate").value = today();
-  const ws = [...(profile.weights||[])].sort((a,b)=>a.date.localeCompare(b.date));
-  if (ws.length < 1){ $("#wChart").innerHTML = `<div class="empty">Add weigh-ins to see your trend${num(profile.goals.weightGoal)?` toward ${profile.goals.weightGoal} lb`:""}.</div>`; $("#wList").innerHTML = ""; return; }
-  const W = 340, H = 160, pl = 34, pb = 20, pt = 10;
-  const goal = num(profile.goals.weightGoal);
-  const vals = ws.map(w=>w.lb).concat(goal?[goal]:[]);
-  const lo = Math.min(...vals) - 2, hi = Math.max(...vals) + 2;
-  const t0 = new Date(ws[0].date).getTime(), t1 = Math.max(t0 + 864e5, new Date(ws[ws.length-1].date).getTime());
-  const X = d => pl + (W - pl - 8) * ((new Date(d).getTime() - t0) / (t1 - t0));
-  const Y = v => pt + (H - pt - pb) * (1 - (v - lo) / (hi - lo));
-  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weight trend"><g font-size="9" fill="var(--sub)">`;
-  for (const t of [lo, (lo+hi)/2, hi]) s += `<line x1="${pl}" x2="${W}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--soft)"/><text x="${pl-4}" y="${Y(t)+3}" text-anchor="end">${Math.round(t)}</text>`;
-  if (goal) s += `<line x1="${pl}" x2="${W}" y1="${Y(goal)}" y2="${Y(goal)}" stroke="var(--hi)" stroke-width="3"/><text x="${W-2}" y="${Y(goal)-4}" text-anchor="end" fill="var(--ink)">Goal ${goal}</text>`;
-  s += `<polyline fill="none" stroke="var(--ink)" stroke-width="2.5" points="${ws.map(w=>X(w.date)+","+Y(w.lb)).join(" ")}"/>`;
-  ws.forEach(w => s += `<circle cx="${X(w.date)}" cy="${Y(w.lb)}" r="3.5" fill="var(--ink)"><title>${w.date}: ${w.lb} lb</title></circle>`);
-  s += `</g></svg>`;
-  $("#wChart").innerHTML = s;
-  $("#wList").innerHTML = `<div class="tablewrap"><table class="t"><tbody>${ws.slice().reverse().slice(0,8).map(w=>`<tr><td>${prettyDate(w.date)}</td><td>${w.lb} lb</td><td style="text-align:right"><button class="x" data-wrm="${w.date}" aria-label="Delete weigh-in">×</button></td></tr>`).join("")}</tbody></table></div>`;
-  $("#wList").querySelectorAll("[data-wrm]").forEach(b => b.onclick = () => { profile.weights = profile.weights.filter(w => w.date !== b.dataset.wrm); saveProfile(); renderProgress(); });
 }
-$("#wSave").onclick = () => {
-  const d = $("#wDate").value, v = num($("#wVal").value);
-  if (!d || !v){ $("#wVal").focus(); return; }
-  profile.weights = (profile.weights||[]).filter(w => w.date !== d).concat([{date:d, lb:v}]);
-  saveProfile(); $("#wVal").value = ""; toast("Weigh-in saved"); renderProgress();
-};
-
-/* ---------- goals ---------- */
 function renderGoals(){
   const g = profile.goals; const v = x => x === null || x === undefined ? "" : x;
   if ($("#goalForm").contains(document.activeElement)) return;
@@ -1356,6 +1558,7 @@ function openBlock(existing){
   };
   $("#blkDlg").showModal();
 }
+$("#trainSeg").querySelectorAll("[data-ts]").forEach(b => b.onclick = () => { tSec = b.dataset.ts; renderTrain(); });
 const _nb = $("#newBlock"); if (_nb) _nb.onclick = () => openBlock(null);
 function renderSources(){
   $("#srcList").innerHTML = Object.entries(SRC).map(([k,x]) => `<p><b>[${k.toUpperCase()}]</b> <a href="${x.u}" target="_blank" rel="noopener">${esc(x.t)}</a>. ${esc(x.w)}</p>`).join("");
