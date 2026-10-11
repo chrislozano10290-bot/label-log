@@ -186,6 +186,7 @@ a{color:var(--acc)}
 
   <!-- SCAN / ADD -->
   <main id="v-scan" data-view class="hidden">
+    <button class="btn ghost sm" data-back style="margin-bottom:10px">‹ Food log</button>
     <h2>Add a food</h2>
     <div id="scanBox">
       <p class="muted">Photograph the Nutrition Facts panel straight on, close enough to fill the frame. Add a second photo of the front if you want the name read too.</p>
@@ -210,6 +211,7 @@ a{color:var(--acc)}
 
   <!-- FOODS -->
   <main id="v-foods" data-view class="hidden">
+    <button class="btn ghost sm" data-back style="margin-bottom:10px">‹ Food log</button>
     <h2>Foods and recipes</h2>
     <div class="row">
       <input type="text" id="foodSearch" class="grow" placeholder="Search your foods" aria-label="Search your foods" style="flex:1 1 200px">
@@ -308,11 +310,10 @@ a{color:var(--acc)}
 <dialog id="liftDlg"><div class="dbody"></div></dialog>
 <nav class="tabs" aria-label="Sections">
   <div class="in">
-    <button data-tab="today" aria-current="page">Today</button>
+    <button data-tab="today" aria-current="page">Food Log</button>
     <button data-tab="train">Train</button>
-    <button data-tab="scan">Add</button>
     <button data-tab="progress">Progress</button>
-    <button data-tab="more">Plan</button>
+    <button data-tab="more">Settings</button>
   </div>
 </nav>
 
@@ -489,7 +490,7 @@ async function pullFromSheet(quiet){
 }
 function syncWords(e){
   if (e === "OFFLINE") return "No signal right now. Your entries are safe on this phone.";
-  if (e === "BAD_TOKEN") return "The sync password doesn't match. Reconnect from the Plan tab.";
+  if (e === "BAD_TOKEN") return "The sync password doesn't match. Reconnect from the Settings tab.";
   if (e === "NOT_SET_UP") return "Not connected to your sheet yet.";
   return "Sync problem: " + e.slice(0, 120);
 }
@@ -558,7 +559,7 @@ $("#pullBtn").onclick = () => { if (confirm("Replace what's on this phone with w
 $("#cfgSave").onclick = () => connect($("#cfgUrl").value, $("#cfgTok").value);
 /* ---------- Progress charts from the sheet ---------- */
 let progCat = "food";
-const PROG_CATS = [["food","Food"],["running","Running"],["strength","Strength"],["body","Body"],["recovery","Recovery"]];
+const PROG_CATS = [["food","Food"],["running","Running"],["strength","Strength"],["body","Body & wellness"]];
 function seriesChart(pts, opts){
   // pts: [[label, value], ...] already in order. opts: {unit, colour, kind:"bar"|"line", goal}
   const W = 340, H = 170, pl = 38, pb = 22, pt = 10;
@@ -613,22 +614,31 @@ function renderSheetCharts(){
       if (!LL_1RM[reps] || !w) return; const e = Math.round(w/(LL_1RM[reps]/100));
       (by[n] = by[n] || []).push([r[0], e]); });
     for (const n of MAIN) if (by[n]) h += `<h3>${esc(n)} · est. 1RM</h3><div class="chart">${seriesChart(by[n], {unit:" lb", colour:"var(--acc)", kind:"line", zero:false, label:n})}</div>`;
+    const vjS = after(S.body).filter(r=>Number(r[2])).map(r=>[r[0], Number(r[2])]);
+    if (vjS.length) h += `<h3>Vertical jump</h3><div class="chart">${seriesChart(vjS, {unit:'"', colour:"var(--acc2)", kind:"line", zero:false, label:"Vertical jump"})}</div>`;
     const others = Object.keys(by).filter(n => !MAIN.includes(n)).sort();
     if (others.length) h += `<h3>Other lifts · best est. 1RM</h3><div class="tablewrap"><table class="t"><thead><tr><th>Lift</th><th>Best</th><th>Last</th></tr></thead><tbody>` +
       others.map(n=>{ const a=by[n]; const best=Math.max(...a.map(x=>x[1])); return `<tr><td>${esc(n)}</td><td>${best} lb</td><td>${esc(a[a.length-1][0])}</td></tr>`; }).join("") + `</tbody></table></div>`;
   }
   if (progCat === "body"){
+    // Newest-first lookups so "latest reading" never depends on the range filter.
+    const byDate = (S.body || []).slice().sort((a,b) => String(b[0]).localeCompare(String(a[0])));
+    const latest = col => byDate.find(r => Number(r[col]));
+    const hrvAll = (S.body || []).filter(r => Number(r[6])).map(r => Number(r[6]));
+    const hrvAvg = hrvAll.length ? hrvAll.reduce((a,b)=>a+b,0)/hrvAll.length : NaN;
+    const sleepRow = latest(4), rhrRow = latest(5), hrvRow = latest(6);
+    const stat = (k, v, sub) => `<div class="macro"><div class="mk">${k}</div><div class="mv">${v}</div>${sub?`<div class="small muted">${esc(sub)}</div>`:""}</div>`;
+    h += `<h3>Latest readings</h3><div class="card"><div class="macros">` +
+      stat("HRV avg", isFinite(hrvAvg) ? Math.round(hrvAvg) + " ms" : "–", hrvRow ? "last " + hrvRow[6] + " ms on " + hrvRow[0] : "") +
+      stat("Sleep", sleepRow ? fmt(Number(sleepRow[4]),"g") + " h" : "–", sleepRow ? "night of " + sleepRow[0] : "") +
+      stat("Resting HR", rhrRow ? Math.round(Number(rhrRow[5])) + " bpm" : "–", rhrRow ? rhrRow[0] : "") +
+      `</div></div>`;
     h += `<h3>Bodyweight</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[1])).map(r=>[r[0], Number(r[1])]), {unit:" lb", colour:"var(--acc)", kind:"line", zero:false, goal: num(profile.goals.weightGoal)||0, label:"Bodyweight"})}</div>`;
-    const vj = after(S.body).filter(r=>Number(r[2])).map(r=>[r[0], Number(r[2])]);
-    if (vj.length) h += `<h3>Vertical jump</h3><div class="chart">${seriesChart(vj, {unit:'"', colour:"var(--acc2)", kind:"line", zero:false, label:"Vertical jump"})}</div>`;
     h += `<h3>Steps each day</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[3])).map(r=>[r[0], Number(r[3])]), {unit:" steps", colour:"var(--carb)", kind:"bar", label:"Steps"})}</div>`;
-    h += `<p class="muted small">Bodyweight and vertical jump are whatever you typed in Body Log. Steps come from intervals.icu.</p>`;
-  }
-  if (progCat === "recovery"){
     h += `<h3>HRV</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[6])).map(r=>[r[0], Number(r[6])]), {unit:" ms", colour:"var(--fat)", kind:"bar", label:"HRV"})}</div>`;
     h += `<h3>Sleep</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[4])).map(r=>[r[0], Number(r[4])]), {unit:" h", colour:"var(--acc2)", kind:"bar", label:"Sleep"})}</div>`;
     h += `<h3>Resting heart rate</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[5])).map(r=>[r[0], Number(r[5])]), {unit:" bpm", colour:"var(--acc)", kind:"line", zero:false, label:"Resting HR"})}</div>`;
-    h += `<p class="muted small">All three come from intervals.icu, for finished days only.</p>`;
+    h += `<p class="muted small">Bodyweight is whatever you typed in Body Log. Steps, HRV, sleep and resting heart rate come from intervals.icu, for finished days only. HRV avg is the average of every HRV reading in your sheet.</p>`;
   }
   host.innerHTML = h;
 }
@@ -661,22 +671,30 @@ function renderTrain(){
 
   if (tSec === "run"){
     const g = (TD.glance || []).find(x => (x.day||"").slice(0,3) === todayAbbr()) || {};
-    const runs = (TD.series.runs || []).slice(-1)[0];
+    const runs = (TD.series.runs || []).slice().sort((a,b) => String(b[0]).localeCompare(String(a[0]))).slice(0, 30);
+    const pace = (mins, mi) => (Number(mins) && Number(mi))
+      ? Math.floor(Number(mins)/Number(mi)) + ":" + String(Math.round(((Number(mins)/Number(mi))%1)*60)).padStart(2,"0") + " /mi"
+      : "–";
     host.innerHTML = `
       <div class="card">
         <div class="small" style="color:var(--carb);font-weight:700;text-transform:uppercase;letter-spacing:.05em">${esc(todayAbbr())} AM · from your Plan tab</div>
         <h3 style="margin:4px 0 6px">${esc(g.am || "Rest")}</h3>
         <div class="muted small">${esc(g.note || "")}</div>
-        <div class="grid2" style="margin-top:10px">
-          <div><div class="small muted">Easy / long pace</div><div style="font-family:var(--display);font-weight:700">13:15–14:00 /mi</div></div>
-          <div><div class="small muted">Fartlek fast reps</div><div style="font-family:var(--display);font-weight:700">10:45–11:45 /mi</div></div>
-        </div>
       </div>
-      ${runs ? `<h3>Last run · ${esc(runs[0])}</h3><div class="card"><div class="macros">
-        <div class="macro"><div class="mk">Miles</div><div class="mv">${fmt(runs[1],"g")}</div></div>
-        <div class="macro"><div class="mk">Avg HR</div><div class="mv">${fmt(runs[3],"")}</div></div>
-        <div class="macro"><div class="mk">Cadence</div><div class="mv">${fmt(runs[4],"")}</div></div>
-      </div><div class="muted small" style="margin-top:8px">Zone ${esc(String(runs[5]||"–"))} · ${esc(String(runs[6]||""))}</div></div>` : ""}
+      <h3>Previous runs</h3>
+      ${runs.length ? runs.map(r => `<div class="card" style="margin-bottom:8px">
+        <div class="row" style="justify-content:space-between;align-items:baseline">
+          <div style="font-family:var(--display);font-weight:700">${esc(String(r[0]))}</div>
+          <div class="small muted">${esc(String(r[6]||""))}</div>
+        </div>
+        <div class="macros" style="margin-top:6px">
+          <div class="macro"><div class="mk">Miles</div><div class="mv">${fmt(r[1],"g")}</div></div>
+          <div class="macro"><div class="mk">Pace</div><div class="mv">${esc(pace(r[2], r[1]))}</div></div>
+          <div class="macro"><div class="mk">Avg HR</div><div class="mv">${fmt(r[3],"")}</div></div>
+          <div class="macro"><div class="mk">Cadence</div><div class="mv">${fmt(r[4],"")}</div></div>
+        </div>
+        ${r[5] ? `<div class="muted small" style="margin-top:6px">Zone ${esc(String(r[5]))}</div>` : ""}
+      </div>`).join("") : `<div class="empty">No runs yet.</div>`}
       <p class="muted small">Runs come from intervals.icu on their own, twice a day. Nothing to log here.</p>
       ${TD.lastImport ? `<p class="muted small">${esc(TD.lastImport)}</p>` : ""}`;
     return;
@@ -826,8 +844,8 @@ if ("serviceWorker" in navigator) window.addEventListener("load", () => navigato
 function apiError(e, what){
   const m = String(e && e.message || e || "");
   if (m.includes("OFFLINE")) return what === "read" ? "No signal. Reading a label needs internet. Type the numbers below, or try again when you're back online." : "No signal. Suggestions need internet.";
-  if (m.includes("NOT_SET_UP")) return "Connect the app to your sheet first (Plan tab).";
-  if (m.includes("BAD_TOKEN")) return "The sync password doesn't match. Reconnect from the Plan tab.";
+  if (m.includes("NOT_SET_UP")) return "Connect the app to your sheet first (Settings tab).";
+  if (m.includes("BAD_TOKEN")) return "The sync password doesn't match. Reconnect from the Settings tab.";
   if (m.includes("NO_KEY")) return "Add your Anthropic API key in the Label Log Sync script (Project Settings, Script properties, ANTHROPIC_API_KEY), then tap Sync now.";
   if (m.includes("API 401")) return "Your API key was rejected. Check that ANTHROPIC_API_KEY is copied exactly.";
   if (m.includes("API 429") || m.includes("API 529")) return "The API is busy or you've hit a rate limit. Wait a minute and try again.";
@@ -855,7 +873,8 @@ function show(tab){
   curTab = tab;
   document.querySelectorAll("[data-view]").forEach(v => v.classList.toggle("hidden", v.id !== "v-" + tab));
   if (tab === "train") loadTraining(false);
-  document.querySelectorAll("nav.tabs button").forEach(b => { if (b.dataset.tab === tab) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
+  const navTab = (tab === "scan" || tab === "foods") ? "today" : tab;
+  document.querySelectorAll("nav.tabs button").forEach(b => { if (b.dataset.tab === navTab) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
   if (tab === "scan" && !editingId) $("#scanBox").classList.toggle("hidden", !hasKey);
   render(); window.scrollTo(0,0);
 }
@@ -1026,7 +1045,7 @@ function renderPlanBox(){
 }
 async function suggestDay(){
   const date = curDate; const T = targetsFor(date);
-  if (!num(T.cal) || !num(T.protein)){ planState = {date, error:"Set calorie and protein targets first (Plan tab)."}; renderPlanBox(); return; }
+  if (!num(T.cal) || !num(T.protein)){ planState = {date, error:"Set calorie and protein targets first (Settings tab)."}; renderPlanBox(); return; }
   const day = logs.get(date) || {entries:[]}; const t = sumN(day.entries.map(e => e.n));
   const rem = {cal:T.cal - t.cal, protein:(T.protein||0) - t.protein, carbs:(T.carbs||0) - t.carbs, fat:(T.fat||0) - t.fat};
   for (const k in rem) rem[k] = Math.max(0, rem[k]);
@@ -1082,6 +1101,7 @@ $("#dPrev").onclick = () => { curDate = addDays(curDate,-1); render(); };
 $("#dNext").onclick = () => { curDate = addDays(curDate,1); render(); };
 $("#dPick").onchange = e => { if (e.target.value){ curDate = e.target.value; render(); } };
 $("#restDay").onchange = e => { getDay(curDate).rest = e.target.checked; saveDay(curDate); };
+document.querySelectorAll("[data-back]").forEach(b => b.onclick = () => show("today"));
 $("#goScan").onclick = () => show("scan");
 $("#goLog").onclick = () => show("foods");
 
