@@ -621,24 +621,36 @@ function renderSheetCharts(){
       others.map(n=>{ const a=by[n]; const best=Math.max(...a.map(x=>x[1])); return `<tr><td>${esc(n)}</td><td>${best} lb</td><td>${esc(a[a.length-1][0])}</td></tr>`; }).join("") + `</tbody></table></div>`;
   }
   if (progCat === "body"){
-    // Newest-first lookups so "latest reading" never depends on the range filter.
-    const byDate = (S.body || []).slice().sort((a,b) => String(b[0]).localeCompare(String(a[0])));
-    const latest = col => byDate.find(r => Number(r[col]));
-    const hrvAll = (S.body || []).filter(r => Number(r[6])).map(r => Number(r[6]));
-    const hrvAvg = hrvAll.length ? hrvAll.reduce((a,b)=>a+b,0)/hrvAll.length : NaN;
-    const sleepRow = latest(4), rhrRow = latest(5), hrvRow = latest(6);
-    const stat = (k, v, sub) => `<div class="macro"><div class="mk">${k}</div><div class="mv">${v}</div>${sub?`<div class="small muted">${esc(sub)}</div>`:""}</div>`;
-    h += `<h3>Latest readings</h3><div class="card"><div class="macros">` +
-      stat("HRV avg", isFinite(hrvAvg) ? Math.round(hrvAvg) + " ms" : "–", hrvRow ? "last " + hrvRow[6] + " ms on " + hrvRow[0] : "") +
-      stat("Sleep", sleepRow ? fmt(Number(sleepRow[4]),"g") + " h" : "–", sleepRow ? "night of " + sleepRow[0] : "") +
-      stat("Resting HR", rhrRow ? Math.round(Number(rhrRow[5])) + " bpm" : "–", rhrRow ? rhrRow[0] : "") +
-      `</div></div>`;
+    // Yesterday, then 7-day and 30-day averages. Windows end yesterday, since
+    // intervals.icu only fills finished days.
+    const yday = addDays(today(), -1);
+    const rowsWith = col => (S.body || []).filter(r => Number(r[col]));
+    const ydayVal = col => { const r = rowsWith(col).find(r => r[0] === yday); return r ? Number(r[col]) : NaN; };
+    const windowAvg = (col, days) => {
+      const from = addDays(today(), -days);
+      const v = rowsWith(col).filter(r => r[0] >= from && r[0] <= yday).map(r => Number(r[col]));
+      return v.length ? v.reduce((a,b)=>a+b,0)/v.length : NaN;
+    };
+    const METRICS = [
+      ["HRV", 6, " ms", 0],
+      ["Sleep", 4, " h", 1],
+      ["Resting HR", 5, " bpm", 0]
+    ];
+    const show = (v, unit, dp) => isFinite(v) ? (dp ? (Math.round(v*10)/10) : Math.round(v)) + unit : "–";
+    h += `<h3>Yesterday and averages</h3><div class="tablewrap"><table class="t"><thead><tr>` +
+      `<th>Metric</th><th>Yesterday</th><th>7-day avg</th><th>30-day avg</th></tr></thead><tbody>` +
+      METRICS.map(([name, col, unit, dp]) =>
+        `<tr><td>${esc(name)}</td><td>${show(ydayVal(col), unit, dp)}</td>` +
+        `<td>${show(windowAvg(col, 7), unit, dp)}</td>` +
+        `<td>${show(windowAvg(col, 30), unit, dp)}</td></tr>`).join("") +
+      `</tbody></table></div>` +
+      `<p class="muted small">Yesterday is ${esc(yday)}. A dash means that day hasn't synced yet. Averages cover the last 7 and 30 days up to yesterday, using whatever days have data.</p>`;
     h += `<h3>Bodyweight</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[1])).map(r=>[r[0], Number(r[1])]), {unit:" lb", colour:"var(--acc)", kind:"line", zero:false, goal: num(profile.goals.weightGoal)||0, label:"Bodyweight"})}</div>`;
     h += `<h3>Steps each day</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[3])).map(r=>[r[0], Number(r[3])]), {unit:" steps", colour:"var(--carb)", kind:"bar", label:"Steps"})}</div>`;
     h += `<h3>HRV</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[6])).map(r=>[r[0], Number(r[6])]), {unit:" ms", colour:"var(--fat)", kind:"bar", label:"HRV"})}</div>`;
     h += `<h3>Sleep</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[4])).map(r=>[r[0], Number(r[4])]), {unit:" h", colour:"var(--acc2)", kind:"bar", label:"Sleep"})}</div>`;
     h += `<h3>Resting heart rate</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[5])).map(r=>[r[0], Number(r[5])]), {unit:" bpm", colour:"var(--acc)", kind:"line", zero:false, label:"Resting HR"})}</div>`;
-    h += `<p class="muted small">Bodyweight is whatever you typed in Body Log. Steps, HRV, sleep and resting heart rate come from intervals.icu, for finished days only. HRV avg is the average of every HRV reading in your sheet.</p>`;
+    h += `<p class="muted small">Bodyweight is whatever you typed in Body Log. Steps, HRV, sleep and resting heart rate come from intervals.icu, for finished days only.</p>`;
   }
   host.innerHTML = h;
 }
