@@ -233,6 +233,10 @@ a{color:var(--acc)}
       <div class="chart" id="calChart"></div>
       <h3>Protein each day</h3>
       <div class="chart" id="proChart"></div>
+      <h3>Carbs each day</h3>
+      <div class="chart" id="carbChart"></div>
+      <h3>Fat each day</h3>
+      <div class="chart" id="fatChart"></div>
       <h3>Averages on days you logged</h3>
       <div class="tablewrap" id="avgTable"></div>
     </div>
@@ -296,6 +300,13 @@ a{color:var(--acc)}
       <label class="f" for="cfgTok">Sync password</label><input id="cfgTok" type="password" autocomplete="off" spellcheck="false">
       <button class="btn" id="cfgSave" style="margin-top:8px">Connect</button>
     </details>
+    <h2>What the charts and scores mean</h2>
+    <p class="small"><b>Food charts.</b> Bars are what you ate; the yellow mark is your goal for that day. Protein, carbs and fat use the same colours as the food log.</p>
+    <p class="small"><b>Fitness score.</b> My own formula, not a standard test. Strength is your best estimated 1RM in the last 120 days against your goals (squat 500, bench 365, deadlift 500, OHP 200). Running is half weekly mileage against 20 mi, half speed-per-heartbeat over the last 28 days. Use it as a trend line, not a number to compare with anyone else.</p>
+    <p class="small"><b>Projected race times.</b> Riegel formula, based on your fastest run of the last 90 days. They are only as good as that run — if your log has no hard efforts, the projections will read slow.</p>
+    <p class="small"><b>Yesterday and averages.</b> A dash means that day hasn't synced yet. The averages cover the last 7 and 30 days up to yesterday, using whatever days have data.</p>
+    <p class="small"><b>Where the body numbers come from.</b> Bodyweight is whatever you typed in Body Log. Steps, HRV, sleep and resting heart rate come from intervals.icu, for finished days only.</p>
+    <p class="small"><b>Runs.</b> They come from intervals.icu on their own, twice a day. There is nothing to log by hand.</p>
     <h2>Where the numbers come from</h2>
     <p class="small">Every amount you log is your amount ÷ the label's serving size, times each number on the label. Logging 85 g of something with a 55 g serving counts 1.55 servings.</p>
     <p class="small">Labels are rounded by law, so "4 × carbs + 4 × protein + 9 × fat" rarely matches the printed calories exactly. The app checks this after a scan and only flags it when the gap is large enough to suggest a misread.</p>
@@ -662,7 +673,6 @@ function renderSheetCharts(){
       <div style="font-family:var(--display);font-size:2rem;font-weight:700">${isFinite(combo)?Math.round(combo):"–"}<span class="small muted" style="font-size:.9rem"> / 100</span></div>
       <div style="margin-top:10px"><div class="small muted">Strength ${isFinite(sc)?Math.round(sc):"–"}</div>${bar(sc,"var(--acc)")}</div>
       <div style="margin-top:8px"><div class="small muted">Running ${isFinite(rn)?Math.round(rn):"–"}</div>${bar(rn,"var(--acc2)")}</div>
-      <p class="muted small" style="margin-top:10px">My own formula, not a standard test. Strength is your best estimated 1RM in the last 120 days against your goals (squat 500, bench 365, deadlift 500, OHP 200). Running is half weekly mileage against 20 mi, half speed-per-heartbeat over the last 28 days. Use it as a trend line, not a number to compare with anyone else.</p>
     </div>`;
   }
   if (progCat === "running"){
@@ -677,7 +687,7 @@ function renderSheetCharts(){
       ? `<div class="tablewrap"><table class="t"><thead><tr><th>Distance</th><th>Projected</th><th>Pace</th></tr></thead><tbody>` +
         RACE_D.map(([n,d]) => { const t = be.mins * Math.pow(d/be.mi, 1.06);
           return `<tr><td>${esc(n)}</td><td>${hhmmss(t)}</td><td>${hhmmss(t/d)} /mi</td></tr>`; }).join("") +
-        `</tbody></table></div><p class="muted small" style="margin-top:8px">Based on your fastest run of the last 90 days: ${fmt(be.mi,"g")} mi in ${hhmmss(be.mins)} on ${esc(be.date)}${be.type?" ("+esc(be.type)+")":""}. Riegel formula. These are only as good as that run — if your log has no hard efforts, the projections will read slow.</p>`
+        `</tbody></table></div><p class="muted small" style="margin-top:8px">Based on your fastest run of the last 90 days: ${fmt(be.mi,"g")} mi in ${hhmmss(be.mins)} on ${esc(be.date)}${be.type?" ("+esc(be.type)+")":""}.</p>`
       : `<div class="empty">Need at least one run of a mile or more in the last 90 days.</div>`) + `</div>`;
     h += `<h3>By heart-rate zone</h3><div class="tablewrap"><table class="t"><thead><tr><th>Zone</th><th>Miles</th><th>Pace</th><th>Cadence</th></tr></thead><tbody>` +
       Object.keys(zs).sort().map(z=>`<tr><td>${esc(z)}</td><td>${fmt(Math.round(zs[z].mi*10)/10,"g")}</td><td>${mmss(avg(zs[z].pace))}</td><td>${isFinite(avg(zs[z].cad))?Math.round(avg(zs[z].cad)):"–"}</td></tr>`).join("") + `</tbody></table></div>`;
@@ -719,14 +729,12 @@ function renderSheetCharts(){
         `<tr><td>${esc(name)}</td><td>${show(ydayVal(col), unit, dp)}</td>` +
         `<td>${show(windowAvg(col, 7), unit, dp)}</td>` +
         `<td>${show(windowAvg(col, 30), unit, dp)}</td></tr>`).join("") +
-      `</tbody></table></div>` +
-      `<p class="muted small">Yesterday is ${esc(yday)}. A dash means that day hasn't synced yet. Averages cover the last 7 and 30 days up to yesterday, using whatever days have data.</p>`;
+      `</tbody></table></div>`;
     h += `<h3>Bodyweight</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[1])).map(r=>[r[0], Number(r[1])]), {unit:" lb", colour:"var(--acc)", kind:"line", zero:false, goal: num(profile.goals.weightGoal)||0, label:"Bodyweight"})}</div>`;
     h += `<h3>Steps each day</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[3])).map(r=>[r[0], Number(r[3])]), {unit:" steps", colour:"var(--carb)", kind:"bar", label:"Steps"})}</div>`;
     h += `<h3>HRV</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[6])).map(r=>[r[0], Number(r[6])]), {unit:" ms", colour:"var(--fat)", kind:"bar", label:"HRV"})}</div>`;
     h += `<h3>Sleep</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[4])).map(r=>[r[0], Number(r[4])]), {unit:" h", colour:"var(--acc2)", kind:"bar", label:"Sleep", hm:true})}</div>`;
     h += `<h3>Resting heart rate</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[5])).map(r=>[r[0], Number(r[5])]), {unit:" bpm", colour:"var(--acc)", kind:"line", zero:false, label:"Resting HR"})}</div>`;
-    h += `<p class="muted small">Bodyweight is whatever you typed in Body Log. Steps, HRV, sleep and resting heart rate come from intervals.icu, for finished days only.</p>`;
   }
   host.innerHTML = h;
 }
@@ -783,7 +791,6 @@ function renderTrain(){
         </div>
         ${r[5] ? `<div class="muted small" style="margin-top:6px">Zone ${esc(String(r[5]))}</div>` : ""}
       </div>`).join("") : `<div class="empty">No runs yet.</div>`}
-      <p class="muted small">Runs come from intervals.icu on their own, twice a day. Nothing to log here.</p>
       ${TD.lastImport ? `<p class="muted small">${esc(TD.lastImport)}</p>` : ""}`;
     return;
   }
@@ -1072,7 +1079,7 @@ function renderToday(){
     const dd = logs.get(addDays(curDate, -i)); if (!dd) continue;
     for (const e of [...dd.entries].reverse()){ if (rec.length >= 8) break; if (!seen.has(e.foodId) && foods.has(e.foodId)){ seen.add(e.foodId); rec.push(foods.get(e.foodId)); } }
   }
-  $("#recent").innerHTML = rec.length ? `<h3>Log again</h3><div>${rec.map(f=>`<button class="chip" data-quick="${esc(f.id)}">${esc(f.name)}</button>`).join("")}</div>` : "";
+  $("#recent").innerHTML = "";   // "Log again" chips removed — the Log a saved food button covers this
   $("#recent").querySelectorAll("[data-quick]").forEach(b => b.onclick = () => openLog(b.dataset.quick));
   renderPlanBox();
   // meals
@@ -1478,22 +1485,23 @@ let range = 7;
 $("#rangeSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
   range = +b.dataset.r; $("#rangeSeg").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); renderProgress();
 });
-function barChart(vals, labels, goalVals, unit){
-  const W = 340, H = 170, pl = 34, pb = 22, pt = 10;
+function barChart(vals, labels, goalVals, unit, colour){
+  const H = 170, pl = 34, pb = 22, pt = 10;
+  const W = Math.max(340, Math.min(2400, pl + 6 + vals.length * 10));
   const max = Math.max(1, ...vals, ...goalVals.filter(Boolean)) * 1.1;
   const bw = (W - pl - 6) / vals.length;
   const y = v => pt + (H - pt - pb) * (1 - v / max);
-  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bar chart"><g font-family="inherit" font-size="9" fill="var(--sub)">`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Bar chart"><g font-family="inherit" font-size="9" fill="var(--sub)">`;
   for (const t of [0, max/2/1.1, max/1.1]){ s += `<line x1="${pl}" x2="${W}" y1="${y(t)}" y2="${y(t)}" stroke="var(--soft)"/><text x="${pl-4}" y="${y(t)+3}" text-anchor="end">${Math.round(t)}</text>`; }
   vals.forEach((v,i) => {
     const x = pl + i*bw + bw*0.15, w = bw*0.7, g = goalVals[i];
     const over = g && v > g;
-    if (v > 0) s += `<rect x="${x}" y="${y(v)}" width="${w}" height="${H-pb-y(v)}" fill="${over?"var(--over)":"var(--ink)"}"><title>${labels[i]}: ${Math.round(v)}${unit}</title></rect>`;
+    if (v > 0) s += `<rect x="${x}" y="${y(v)}" width="${w}" height="${H-pb-y(v)}" fill="${over?"var(--over)":(colour||"var(--acc2)")}"><title>${labels[i]}: ${Math.round(v)}${unit}</title></rect>`;
     if (g) s += `<line x1="${x-bw*0.12}" x2="${x+w+bw*0.12}" y1="${y(g)}" y2="${y(g)}" stroke="var(--hi)" stroke-width="3"/>`;
-    const every = vals.length > 14 ? 5 : vals.length > 7 ? 2 : 1;
+    const every = Math.max(1, Math.ceil(34 / bw));
     if (i % every === 0 || i === vals.length-1) s += `<text x="${x+w/2}" y="${H-6}" text-anchor="middle">${labels[i]}</text>`;
   });
-  return s + `</g></svg><p class="muted small">Bars are what you ate. Yellow marks are your goal.</p>`;
+  return s + `</g></svg>`;
 }
 function renderProgress(){
   renderSheetCharts();
@@ -1501,8 +1509,10 @@ function renderProgress(){
   const days = []; for (let i = range-1; i >= 0; i--) days.push(addDays(today(), -i));
   const tots = days.map(d => sumN((logs.get(d)||{entries:[]}).entries.map(e => e.n)));
   const lbl = days.map(d => { const z = new Date(d+"T12:00:00"); return (z.getMonth()+1)+"/"+z.getDate(); });
-  $("#calChart").innerHTML = barChart(tots.map(t=>t.cal), lbl, days.map(d => num(targetsFor(d).cal)), " cal");
-  $("#proChart").innerHTML = barChart(tots.map(t=>t.protein), lbl, days.map(d => num(targetsFor(d).protein)), " g");
+  $("#calChart").innerHTML  = barChart(tots.map(t=>t.cal),     lbl, days.map(d => num(targetsFor(d).cal)),     " cal", "var(--acc2)");
+  $("#proChart").innerHTML  = barChart(tots.map(t=>t.protein), lbl, days.map(d => num(targetsFor(d).protein)), " g",   "var(--acc)");
+  $("#carbChart").innerHTML = barChart(tots.map(t=>t.carbs),   lbl, days.map(d => num(targetsFor(d).carbs)),   " g",   "var(--carb)");
+  $("#fatChart").innerHTML  = barChart(tots.map(t=>t.fat),     lbl, days.map(d => num(targetsFor(d).fat)),     " g",   "var(--fat)");
   const logged = days.map((d,i) => ({d, t:tots[i], has:(logs.get(d)||{entries:[]}).entries.length>0})).filter(x => x.has);
   if (!logged.length){ $("#avgTable").innerHTML = `<div class="empty">Log a few days of food to see averages here.</div>`; }
   else {

@@ -1,6 +1,6 @@
 // Keeps the app working with no signal. Pages load from the network when online (so updates arrive)
 // and from this cache when offline. Requests to your sheet are never cached.
-const CACHE = "labellog-v7";
+const CACHE = "labellog-v8";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {
