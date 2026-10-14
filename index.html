@@ -706,6 +706,15 @@ function renderSheetCharts(){
       others.map(n=>{ const a=by[n]; const best=Math.max(...a.map(x=>x[1])); return `<tr><td>${esc(n)}</td><td>${best} lb</td><td>${esc(a[a.length-1][0])}</td></tr>`; }).join("") + `</tbody></table></div>`;
   }
   if (progCat === "body"){
+    h += `<h3>Log bodyweight</h3><div class="card">
+      <label class="f" for="bwDate">Date</label><input id="bwDate" type="date" value="${today()}" max="${today()}">
+      <div class="row" style="gap:10px">
+        <div class="grow"><label class="f" for="bwLb">Weight (lb)</label><input id="bwLb" type="number" inputmode="decimal" step="0.1" min="50" max="600"></div>
+        <div class="grow"><label class="f" for="bwVj">Vertical jump (in, optional)</label><input id="bwVj" type="number" inputmode="decimal" step="0.5" min="1" max="60"></div>
+      </div>
+      <button class="btn" id="bwSave" style="margin-top:10px;width:100%">Save</button>
+      <p class="muted small" style="margin-top:6px">Writes to Body Log in your sheet. Leaving a box empty keeps whatever is already there for that date.</p>
+    </div>`;
     // Yesterday, then 7-day and 30-day averages. Windows end yesterday, since
     // intervals.icu only fills finished days.
     const yday = addDays(today(), -1);
@@ -737,6 +746,30 @@ function renderSheetCharts(){
     h += `<h3>Resting heart rate</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[5])).map(r=>[r[0], Number(r[5])]), {unit:" bpm", colour:"var(--acc)", kind:"line", zero:false, label:"Resting HR"})}</div>`;
   }
   host.innerHTML = h;
+  if (progCat === "body") wireBodyLog();
+}
+function wireBodyLog(){
+  const fill = () => { const d = $("#bwDate").value; const r = (TD && TD.series.body || []).find(r => r[0] === d);
+    $("#bwLb").value = r && Number(r[1]) ? r[1] : ""; $("#bwVj").value = r && Number(r[2]) ? r[2] : ""; };
+  $("#bwDate").onchange = fill; fill();
+  $("#bwSave").onclick = () => {
+    const date = $("#bwDate").value, w = num($("#bwLb").value), vj = num($("#bwVj").value);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today()) return toast("Pick a date up to today");
+    if (w === null && vj === null) return toast("Enter a weight or a jump");
+    if (w !== null && (w < 50 || w > 600)) return toast("Weight should be between 50 and 600 lb");
+    if (vj !== null && (vj <= 0 || vj > 60)) return toast("Jump should be between 1 and 60 in");
+    const e = {date}; if (w !== null) e.weight = w; if (vj !== null) e.vert = vj;
+    if (TD && TD.series){
+      const body = TD.series.body = TD.series.body || [];
+      let r = body.find(r => r[0] === date);
+      if (!r){ r = [date, "", "", "", "", "", "", ""]; body.push(r); body.sort((x,y) => String(x[0]).localeCompare(String(y[0]))); }
+      if (w !== null) r[1] = w; if (vj !== null) r[2] = vj;
+      kvSet("training", {at: Date.now(), d: TD}).catch(console.error);
+    }
+    enqueue("b/" + date, "llLogBody", [e]);
+    toast("Saved" + (w !== null ? " " + w + " lb" : "") + (vj !== null ? (w !== null ? ", " : " ") + vj + '" jump' : ""));
+    renderProgress();
+  };
 }
 
 /* ---------- Training ---------- */
@@ -1547,7 +1580,16 @@ function renderGoals(){
 }
 
 /* ---------- training blocks ---------- */
-function latestWeight(){ const ws = [...(profile.weights||[])].sort((a,b)=>a.date.localeCompare(b.date)); return ws.length ? ws[ws.length-1].lb : null; }
+// Weigh-ins come from Body Log (via the training data). Older in-app weights fill any dates Body Log doesn't have.
+let bwTried = false;
+function bodyWeights(){
+  if (!TD && !bwTried){ bwTried = true; loadTraining(false).then(() => { if (TD) renderBlocks(); }); }
+  const m = new Map();
+  (profile.weights||[]).forEach(w => { if (w && w.date && Number(w.lb)) m.set(w.date, Number(w.lb)); });
+  ((TD && TD.series && TD.series.body) || []).forEach(r => { if (Number(r[1])) m.set(String(r[0]), Number(r[1])); });
+  return [...m].map(([date, lb]) => ({date, lb})).sort((a,b) => a.date.localeCompare(b.date));
+}
+function latestWeight(){ const ws = bodyWeights(); return ws.length ? ws[ws.length-1].lb : null; }
 function computeBlock(i){
   const kg = i.weightLb / 2.20462; const G = GOALS[i.goal]; const L = LOADS[i.load];
   const sign = i.goal === "gain" ? 1 : i.goal === "lose" ? -1 : 0;
@@ -1571,7 +1613,7 @@ function computeBlock(i){
 function blockFeedback(b){
   const end = b.end < today() ? b.end : today();
   if (end < b.start) return null;
-  const ws = (profile.weights||[]).filter(w => w.date >= b.start && w.date <= end).sort((x,y)=>x.date.localeCompare(y.date));
+  const ws = bodyWeights().filter(w => w.date >= b.start && w.date <= end);
   const cals = []; for (let d = b.start, n = 0; d <= end && n < 400; d = addDays(d,1), n++){ const day = logs.get(d); if (day && day.entries.length) cals.push(sumN(day.entries.map(e=>e.n)).cal); }
   const avgCal = cals.length ? cals.reduce((a,c)=>a+c,0)/cals.length : null;
   const out = {avgCal, nDays:cals.length};
