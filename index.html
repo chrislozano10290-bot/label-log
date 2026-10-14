@@ -630,14 +630,24 @@ function seriesChart(pts, opts){
   if (!vals.length) return `<div class="empty">No data yet.</div>`;
   // Grow the canvas with the data so points keep ~10px of room, then let the
   // wrapper scroll sideways instead of squashing everything together.
-  const H = 170, pl = 38, pb = 22, pt = 10;
-  const W = Math.max(340, Math.min(2400, pl + 6 + pts.length * 10));
-  const lo = opts.zero === false ? Math.min(...vals) * 0.97 : 0;
-  const hi = Math.max(...vals, opts.goal || 0) * 1.08 || 1;
+  // Optional per-chart overrides: opts.h (height), opts.px (room per point), opts.tight (fit y-range to the data).
+  const H = opts.h || 170, pl = 38, pb = 22, pt = 10, px = opts.px || 10, pr = opts.tight ? 40 : 6;
+  const W = Math.max(340, Math.min(2400, pl + pr + pts.length * px));
+  let lo, hi;
+  if (opts.tight){
+    const all = opts.goal ? [...vals, opts.goal] : vals;
+    const mn = Math.min(...all), mx = Math.max(...all), pad = Math.max(1, (mx - mn) * 0.08);
+    lo = mn - pad; hi = mx + pad;
+  } else {
+    lo = opts.zero === false ? Math.min(...vals) * 0.97 : 0;
+    hi = Math.max(...vals, opts.goal || 0) * 1.08 || 1;
+  }
+  const ticks = opts.tight ? [0,1,2,3,4].map(i => lo + (hi-lo)*i/4) : [lo, (lo+hi)/2, hi];
+  const tl = t => opts.tight && hi - lo < 15 ? t.toFixed(1) : Math.round(t);
   const y = v => pt + (H - pt - pb) * (1 - (v - lo) / (hi - lo || 1));
-  const n = pts.length, bw = (W - pl - 6) / n;
-  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="xMinYMid meet" role="img" aria-label="${esc(opts.label||"Chart")}"><g font-family="inherit" font-size="9" fill="var(--sub)">`;
-  for (const t of [lo, (lo+hi)/2, hi]) s += `<line x1="${pl}" x2="${W}" y1="${y(t)}" y2="${y(t)}" stroke="var(--soft)"/><text x="${pl-4}" y="${y(t)+3}" text-anchor="end">${Math.round(t)}</text>`;
+  const n = pts.length, bw = (W - pl - pr) / n;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="height:${H}px" preserveAspectRatio="xMinYMid meet" role="img" aria-label="${esc(opts.label||"Chart")}"><g font-family="inherit" font-size="9" fill="var(--sub)">`;
+  for (const t of ticks) s += `<line x1="${pl}" x2="${W}" y1="${y(t)}" y2="${y(t)}" stroke="var(--soft)"/><text x="${pl-4}" y="${y(t)+3}" text-anchor="end">${tl(t)}</text>` + (opts.tight ? `<text x="${W-4}" y="${y(t)+3}" text-anchor="end">${tl(t)}</text>` : "");
   if (opts.goal) s += `<line x1="${pl}" x2="${W}" y1="${y(opts.goal)}" y2="${y(opts.goal)}" stroke="var(--acc2)" stroke-width="2" stroke-dasharray="4 3"/>`;
   if (opts.kind === "line"){
     const pathPts = pts.map((p,i) => isFinite(p[1]) ? `${pl + i*bw + bw/2},${y(p[1])}` : null).filter(Boolean);
@@ -739,13 +749,14 @@ function renderSheetCharts(){
         `<td>${show(windowAvg(col, 7), unit, dp)}</td>` +
         `<td>${show(windowAvg(col, 30), unit, dp)}</td></tr>`).join("") +
       `</tbody></table></div>`;
-    h += `<h3>Bodyweight</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[1])).map(r=>[r[0], Number(r[1])]), {unit:" lb", colour:"var(--acc)", kind:"line", zero:false, goal: num(profile.goals.weightGoal)||0, label:"Bodyweight"})}</div>`;
+    h += `<h3>Bodyweight</h3><div class="chart" data-end="1">${seriesChart(after(S.body).filter(r=>Number(r[1])).map(r=>[r[0], Number(r[1])]), {unit:" lb", colour:"var(--acc)", kind:"line", zero:false, goal: num(profile.goals.weightGoal)||0, label:"Bodyweight", h:260, px:18, tight:true})}</div>`;
     h += `<h3>Steps each day</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[3])).map(r=>[r[0], Number(r[3])]), {unit:" steps", colour:"var(--carb)", kind:"bar", label:"Steps"})}</div>`;
     h += `<h3>HRV</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[6])).map(r=>[r[0], Number(r[6])]), {unit:" ms", colour:"var(--fat)", kind:"bar", label:"HRV"})}</div>`;
     h += `<h3>Sleep</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[4])).map(r=>[r[0], Number(r[4])]), {unit:" h", colour:"var(--acc2)", kind:"bar", label:"Sleep", hm:true})}</div>`;
     h += `<h3>Resting heart rate</h3><div class="chart">${seriesChart(after(S.body).filter(r=>Number(r[5])).map(r=>[r[0], Number(r[5])]), {unit:" bpm", colour:"var(--acc)", kind:"line", zero:false, label:"Resting HR"})}</div>`;
   }
   host.innerHTML = h;
+  host.querySelectorAll(".chart[data-end]").forEach(c => c.scrollLeft = c.scrollWidth);   // open long charts on the latest date
   if (progCat === "body") wireBodyLog();
 }
 function wireBodyLog(){
@@ -1524,7 +1535,7 @@ function barChart(vals, labels, goalVals, unit, colour){
   const max = Math.max(1, ...vals, ...goalVals.filter(Boolean)) * 1.1;
   const bw = (W - pl - 6) / vals.length;
   const y = v => pt + (H - pt - pb) * (1 - v / max);
-  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Bar chart"><g font-family="inherit" font-size="9" fill="var(--sub)">`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="height:${H}px" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Bar chart"><g font-family="inherit" font-size="9" fill="var(--sub)">`;
   for (const t of [0, max/2/1.1, max/1.1]){ s += `<line x1="${pl}" x2="${W}" y1="${y(t)}" y2="${y(t)}" stroke="var(--soft)"/><text x="${pl-4}" y="${y(t)+3}" text-anchor="end">${Math.round(t)}</text>`; }
   vals.forEach((v,i) => {
     const x = pl + i*bw + bw*0.15, w = bw*0.7, g = goalVals[i];
