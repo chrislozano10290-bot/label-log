@@ -718,12 +718,9 @@ function renderSheetCharts(){
   if (progCat === "body"){
     h += `<h3>Log bodyweight</h3><div class="card">
       <label class="f" for="bwDate">Date</label><input id="bwDate" type="date" value="${today()}" max="${today()}">
-      <div class="row" style="gap:10px">
-        <div class="grow"><label class="f" for="bwLb">Weight (lb)</label><input id="bwLb" type="number" inputmode="decimal" step="0.1" min="50" max="600"></div>
-        <div class="grow"><label class="f" for="bwVj">Vertical jump (in, optional)</label><input id="bwVj" type="number" inputmode="decimal" step="0.5" min="1" max="60"></div>
-      </div>
+      <label class="f" for="bwLb">Weight (lb)</label><input id="bwLb" type="number" inputmode="decimal" step="0.1" min="50" max="600">
       <button class="btn" id="bwSave" style="margin-top:10px;width:100%">Save</button>
-      <p class="muted small" style="margin-top:6px">Writes to Body Log in your sheet. Leaving a box empty keeps whatever is already there for that date.</p>
+      <p class="muted small" style="margin-top:6px">Writes to Body Log in your sheet.</p>
     </div>`;
     // Yesterday, then 7-day and 30-day averages. Windows end yesterday, since
     // intervals.icu only fills finished days.
@@ -761,24 +758,23 @@ function renderSheetCharts(){
 }
 function wireBodyLog(){
   const fill = () => { const d = $("#bwDate").value; const r = (TD && TD.series.body || []).find(r => r[0] === d);
-    $("#bwLb").value = r && Number(r[1]) ? r[1] : ""; $("#bwVj").value = r && Number(r[2]) ? r[2] : ""; };
+    $("#bwLb").value = r && Number(r[1]) ? r[1] : ""; };
   $("#bwDate").onchange = fill; fill();
   $("#bwSave").onclick = () => {
-    const date = $("#bwDate").value, w = num($("#bwLb").value), vj = num($("#bwVj").value);
+    const date = $("#bwDate").value, w = num($("#bwLb").value);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today()) return toast("Pick a date up to today");
-    if (w === null && vj === null) return toast("Enter a weight or a jump");
-    if (w !== null && (w < 50 || w > 600)) return toast("Weight should be between 50 and 600 lb");
-    if (vj !== null && (vj <= 0 || vj > 60)) return toast("Jump should be between 1 and 60 in");
-    const e = {date}; if (w !== null) e.weight = w; if (vj !== null) e.vert = vj;
+    if (w === null) return toast("Enter a weight");
+    if (w < 50 || w > 600) return toast("Weight should be between 50 and 600 lb");
+    const e = {date, weight: w};
     if (TD && TD.series){
       const body = TD.series.body = TD.series.body || [];
       let r = body.find(r => r[0] === date);
       if (!r){ r = [date, "", "", "", "", "", "", ""]; body.push(r); body.sort((x,y) => String(x[0]).localeCompare(String(y[0]))); }
-      if (w !== null) r[1] = w; if (vj !== null) r[2] = vj;
+      r[1] = w;
       kvSet("training", {at: Date.now(), d: TD}).catch(console.error);
     }
     enqueue("b/" + date, "llLogBody", [e]);
-    toast("Saved" + (w !== null ? " " + w + " lb" : "") + (vj !== null ? (w !== null ? ", " : " ") + vj + '" jump' : ""));
+    toast("Saved " + w + " lb");
     renderProgress();
   };
 }
