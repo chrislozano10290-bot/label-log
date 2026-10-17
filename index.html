@@ -659,7 +659,7 @@ function seriesChart(pts, opts){
       s += `<rect x="${x}" y="${y(p[1])}" width="${w}" height="${Math.max(0, y(lo)-y(p[1]))}" rx="2" fill="${opts.colour}"><title>${esc(p[0])}: ${opts.hm?hmLabel(p[1]):fmt(p[1],"g")+(opts.unit||"")}</title></rect>`; });
   }
   const every = Math.max(1, Math.ceil(34 / bw));   // one label per ~34px of width
-  pts.forEach((p,i) => { if (i % every === 0 || i === n-1) s += `<text x="${pl+i*bw+bw/2}" y="${H-6}" text-anchor="middle">${esc(String(p[0]).slice(5))}</text>`; });
+  pts.forEach((p,i) => { if (i % every === 0 || i === n-1) s += `<text x="${pl+i*bw+bw/2}" y="${H-6}" text-anchor="middle">${esc(opts.rawx ? String(p[0]) : String(p[0]).slice(5))}</text>`; });
   return s + `</g></svg>`;
 }
 function weekKey(d){ const z = new Date(d + "T12:00:00"); const day = (z.getDay()+6)%7; z.setDate(z.getDate()-day); return z.toISOString().slice(0,10); }
@@ -781,6 +781,7 @@ function wireBodyLog(){
 
 /* ---------- Training ---------- */
 let TD = null, tSec = "strength", tDay = "", tLoading = false;
+const HR = {}, hrOpen = new Set();   // per-run heart-rate streams, keyed "date|miles"
 const DAY_ABBR = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 function todayAbbr(){ return DAY_ABBR[new Date(curDate + "T12:00:00").getDay()]; }
 async function loadTraining(force){
@@ -797,6 +798,31 @@ function trainStyle(kind){
   if (kind === "iso") return {c:"var(--acc2)", t:"Iso hold"};
   if (kind === "mobility") return {c:"var(--acc2)", t:"Mobility"};
   return {c:"var(--acc)", t:"Lift"};
+}
+function hrBlock(key, avg){
+  const d = HR[key];
+  if (!d || d === "loading") return `<div class="muted small">Loading heart rate…</div>`;
+  if (d.error) return `<div class="muted small">${d.error === "NO_ID" || d.error === "NO_HR" ? "No heart-rate recording for this run." : "Couldn't load heart rate (" + esc(syncWords(String(d.error))) + ")."}</div>`;
+  const step = d.step || 30;
+  const pts = d.hr.map((v, i) => [Math.round(i * step / 60) + "m", v]);
+  const a = Number(avg) || Math.round(d.hr.reduce((x, y) => x + y, 0) / d.hr.length);
+  return `<div class="small muted">Max ${fmt(d.max, "")} bpm · dashed line = average ${fmt(a, "")} bpm · one point every ${step} sec</div>
+    <div class="chart">${seriesChart(pts, {unit: " bpm", colour: "var(--acc)", kind: "line", goal: a, tight: true, rawx: true, px: 4, h: 150, label: "Heart rate over time"})}</div>`;
+}
+async function toggleHR(key){
+  if (hrOpen.has(key)){ hrOpen.delete(key); renderTrain(); return; }
+  hrOpen.add(key);
+  if (!HR[key] || HR[key].error){
+    const c = await kvGet("hr:" + key).catch(() => null);
+    if (c) HR[key] = c;
+    else {
+      HR[key] = "loading"; renderTrain();
+      const [date, miles] = key.split("|");
+      try { const d = await remote("llGetHRStream", [date, Number(miles)], 120000); HR[key] = d; if (!d.error) await kvSet("hr:" + key, d); }
+      catch(e){ HR[key] = {error: String(e.message)}; }
+    }
+  }
+  renderTrain();
 }
 function renderTrain(){
   const host = $("#trainBody"); if (!host) return;
@@ -830,8 +856,11 @@ function renderTrain(){
           <div class="macro"><div class="mk">Cadence</div><div class="mv">${fmt(r[4],"")}</div></div>
         </div>
         ${r[5] ? `<div class="muted small" style="margin-top:6px">Zone ${esc(String(r[5]))}</div>` : ""}
+        <button class="btn sm ghost" data-hr="${esc(r[0] + "|" + r[1])}" style="margin-top:8px">${hrOpen.has(r[0] + "|" + r[1]) ? "Hide heart rate" : "Heart rate"}</button>
+        ${hrOpen.has(r[0] + "|" + r[1]) ? `<div style="margin-top:8px">${hrBlock(r[0] + "|" + r[1], r[3])}</div>` : ""}
       </div>`).join("") : `<div class="empty">No runs yet.</div>`}
       ${TD.lastImport ? `<p class="muted small">${esc(TD.lastImport)}</p>` : ""}`;
+    host.querySelectorAll("[data-hr]").forEach(b => b.onclick = () => toggleHR(b.dataset.hr));
     return;
   }
 
