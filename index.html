@@ -907,13 +907,13 @@ function openLift(name, kind){
   d.querySelector(".dbody").innerHTML = `
     <h2 style="margin-bottom:2px">${esc(name)}</h2>
     <div class="muted small">${plyo?"Saves to your Plyo Log":"Saves to your Lift Log"}${last?` · last ${esc(last.date)}`:" · no earlier entry"}</div>
-    <div class="grid3" style="margin-top:12px">${f.map(([id,lbl,v,step])=>`
-      <div><label class="f" for="lf_${id}">${lbl}</label>
-        <div class="row" style="gap:4px;flex-wrap:nowrap">
-          <button class="btn sm ghost" data-step="${id}:-${step}" aria-label="Less ${lbl}">−</button>
-          <input id="lf_${id}" type="number" step="any" inputmode="decimal" value="${v===undefined||v===null?"":v}" style="text-align:center">
-          <button class="btn sm ghost" data-step="${id}:${step}" aria-label="More ${lbl}">+</button>
-        </div></div>`).join("")}</div>
+    <div style="margin-top:12px">${f.map(([id,lbl,v,step])=>`
+      <div class="row" style="flex-wrap:nowrap;gap:8px;margin-bottom:10px">
+        <label class="f" for="lf_${id}" style="flex:1 1 auto;min-width:0;margin:0">${lbl}</label>
+        <button class="btn ghost" style="flex:0 0 48px;padding:0" data-step="${id}:-${step}" aria-label="Less ${lbl}">−</button>
+        <input id="lf_${id}" type="number" step="any" inputmode="decimal" value="${v===undefined||v===null?"":v}" style="flex:0 0 84px;width:84px;text-align:center;font-size:1.1rem">
+        <button class="btn ghost" style="flex:0 0 48px;padding:0" data-step="${id}:${step}" aria-label="More ${lbl}">+</button>
+      </div>`).join("")}</div>
     <label class="f" for="lf_note">Note (optional)</label>
     <input id="lf_note" type="text" placeholder="e.g. belt on last set">
     ${plyo?"":`<div class="note" id="lf_est" style="margin-top:12px"></div>`}
