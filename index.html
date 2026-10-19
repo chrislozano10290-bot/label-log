@@ -1058,7 +1058,8 @@ function targetsFor(date){
   const b = blockFor(date);
   if (b){ const t = b.targets; return {block:b, rest, cal: rest ? t.restCal : t.cal, protein:t.protein, carbs: rest ? t.restCarbs : t.carbs, fat:t.fat}; }
   const g = profile.goals;
-  return {block:null, rest, cal: rest && num(g.restCal) ? g.restCal : g.cal, protein:g.protein, carbs:g.carbs, fat:g.fat};
+  if (rest && num(g.restCal)) return {block:null, rest, cal:g.restCal, protein: num(g.restProtein) ?? g.protein, carbs: num(g.restCarbs) ?? g.carbs, fat: num(g.restFat) ?? g.fat};
+  return {block:null, rest, cal:g.cal, protein:g.protein, carbs:g.carbs, fat:g.fat};
 }
 function daysBetween(a, b){ return Math.round((new Date(b+"T12:00:00") - new Date(a+"T12:00:00")) / 864e5); }
 function blockWeek(b, date){ return {week: Math.floor(daysBetween(b.start, date)/7) + 1, weeks: Math.ceil((daysBetween(b.start, b.end) + 1)/7)}; }
@@ -1596,22 +1597,43 @@ function renderProgress(){
 function renderGoals(){
   const g = profile.goals; const v = x => x === null || x === undefined ? "" : x;
   if ($("#goalForm").contains(document.activeElement)) return;
-  $("#goalForm").innerHTML = `
+  const set = (k, t) => `
     <div class="grid2">
-      <div><label class="f" for="g-cal">Calories</label><input type="number" id="g-cal" value="${v(g.cal)}"></div>
-      <div><label class="f" for="g-rest">Rest-day calories</label><input type="number" id="g-rest" value="${v(g.restCal)}" placeholder="Same as above"></div>
-      <div><label class="f" for="g-pro">Protein (g)</label><input type="number" id="g-pro" value="${v(g.protein)}"></div>
-      <div><label class="f" for="g-carb">Carbs (g)</label><input type="number" id="g-carb" value="${v(g.carbs)}"></div>
-      <div><label class="f" for="g-fat">Fat (g)</label><input type="number" id="g-fat" value="${v(g.fat)}"></div>
-      <div><label class="f" for="g-wt">Goal weight (lb)</label><input type="number" id="g-wt" step="0.1" value="${v(g.weightGoal)}"></div>
+      <div><label class="f" for="g-${k}cal">Calories</label><input type="number" id="g-${k}cal" value="${v(t.cal)}" ${k?'placeholder="Same as training"':""}></div>
+      <div><label class="f" for="g-${k}pro">Protein (g)</label><input type="number" id="g-${k}pro" value="${v(t.p)}" ${k?'placeholder="Same as training"':""}></div>
+      <div><label class="f" for="g-${k}carb">Carbs (g)</label><input type="number" id="g-${k}carb" value="${v(t.c)}" ${k?'placeholder="Same as training"':""}></div>
+      <div><label class="f" for="g-${k}fat">Fat (g)</label><input type="number" id="g-${k}fat" value="${v(t.f)}" ${k?'placeholder="Same as training"':""}></div>
     </div>
-    <div id="g-split" class="muted small" style="margin-top:8px"></div>
+    <div id="g-${k}split" class="muted small" style="margin-top:6px"></div>`;
+  $("#goalForm").innerHTML = `
+    <div class="lbl">Training day</div>${set("", {cal:g.cal, p:g.protein, c:g.carbs, f:g.fat})}
+    <div class="lbl" style="margin-top:14px">Rest day</div>${set("r", {cal:g.restCal, p:g.restProtein, c:g.restCarbs, f:g.restFat})}
+    <p class="muted small" style="margin-top:4px">Changing calories rescales protein, carbs and fat to keep the same % split. You can still edit any macro by hand.</p>
+    <div class="grid2" style="margin-top:8px"><div><label class="f" for="g-wt">Goal weight (lb)</label><input type="number" id="g-wt" step="0.1" value="${v(g.weightGoal)}"></div></div>
     <button class="btn" style="margin-top:12px" type="submit">Save goals</button>`;
-  const split = () => { const p = num($("#g-pro").value)||0, c = num($("#g-carb").value)||0, f = num($("#g-fat").value)||0; const tot = 4*p+4*c+9*f;
-    $("#g-split").textContent = tot ? `These macros add up to ${Math.round(tot).toLocaleString()} cal: ${Math.round(4*c/tot*100)}% carbs, ${Math.round(9*f/tot*100)}% fat, ${Math.round(4*p/tot*100)}% protein.` : ""; };
-  $("#goalForm").querySelectorAll("input").forEach(i => i.oninput = split); split();
+  const val = id => num($(id).value);
+  // macros for a set; blank rest-day boxes fall back to the training-day numbers
+  const mac = k => ["pro","carb","fat"].map(m => val(`#g-${k}${m}`) ?? (k ? val(`#g-${m}`) : null) ?? 0);
+  const split = k => { const [p,c,f] = mac(k); const tot = 4*p+4*c+9*f;
+    $(`#g-${k}split`).textContent = tot ? `Macros add up to ${Math.round(tot).toLocaleString()} cal: ${Math.round(4*c/tot*100)}% carbs, ${Math.round(9*f/tot*100)}% fat, ${Math.round(4*p/tot*100)}% protein.` : ""; };
+  const splitAll = () => { split(""); split("r"); };
+  ["", "r"].forEach(k => {
+    const cal = $(`#g-${k}cal`); let base = null;
+    cal.onfocus = () => { base = mac(k); };            // snapshot so typing "2","25","250"... doesn't drift
+    cal.oninput = () => {
+      const C = num(cal.value); if (!base) base = mac(k);
+      const [p,c,f] = base, tot = 4*p+4*c+9*f;
+      if (C && C > 0 && tot > 0){ const r = C/tot;
+        $(`#g-${k}pro`).value = Math.round(p*r); $(`#g-${k}carb`).value = Math.round(c*r); $(`#g-${k}fat`).value = Math.round(f*r); }
+      splitAll(); };
+    cal.onblur = () => { base = null; };
+  });
+  $("#goalForm").querySelectorAll("input").forEach(i => { if (!/cal$/.test(i.id)) i.oninput = splitAll; }); splitAll();
   $("#goalForm").onsubmit = e => { e.preventDefault();
-    profile.goals = {cal:num($("#g-cal").value), restCal:num($("#g-rest").value), protein:num($("#g-pro").value), carbs:num($("#g-carb").value), fat:num($("#g-fat").value), weightGoal:num($("#g-wt").value)};
+    const rc = val("#g-rcal");
+    profile.goals = {cal:val("#g-cal"), protein:val("#g-pro"), carbs:val("#g-carb"), fat:val("#g-fat"),
+      restCal:rc, restProtein: rc ? val("#g-rpro") : null, restCarbs: rc ? val("#g-rcarb") : null, restFat: rc ? val("#g-rfat") : null,
+      weightGoal:val("#g-wt")};
     saveProfile(); document.activeElement.blur(); toast("Goals saved"); };
 }
 
