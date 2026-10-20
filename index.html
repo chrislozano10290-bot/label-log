@@ -733,12 +733,14 @@ function renderSheetCharts(){
       return v.length ? v.reduce((a,b)=>a+b,0)/v.length : NaN;
     };
     const METRICS = [
+      ["Bodyweight", 1, " lb", 1],
+      ["Steps", 3, " steps", 0],
       ["HRV", 6, " ms", 0],
       ["Sleep", 4, " h", 1],
       ["Resting HR", 5, " bpm", 0]
     ];
     const hm = v => { const t = Math.round(v*60); return Math.floor(t/60) + "h" + String(t%60).padStart(2,"0") + "m"; };
-    const show = (v, unit, dp) => !isFinite(v) ? "–" : unit === " h" ? hm(v) : (dp ? (Math.round(v*10)/10) : Math.round(v)) + unit;
+    const show = (v, unit, dp) => !isFinite(v) ? "–" : unit === " h" ? hm(v) : unit === " steps" ? Math.round(v).toLocaleString("en-US") : (dp ? v.toFixed(1) : Math.round(v)) + unit;
     h += `<h3>Yesterday and averages</h3><div class="tablewrap"><table class="t"><thead><tr>` +
       `<th>Metric</th><th>Yesterday</th><th>7-day avg</th><th>30-day avg</th></tr></thead><tbody>` +
       METRICS.map(([name, col, unit, dp]) =>
