@@ -809,14 +809,67 @@ function hrBlock(key, avg){
   const pts = d.hr.map((v, i) => [Math.round(i * step / 60) + "m", v]);
   const a = Number(avg) || Math.round(d.hr.reduce((x, y) => x + y, 0) / d.hr.length);
   return `<div class="small muted">Max ${fmt(d.max, "")} bpm · dashed line = average ${fmt(a, "")} bpm · one point every ${step} sec</div>
-    <div class="chart">${seriesChart(pts, {unit: " bpm", colour: "var(--acc)", kind: "line", goal: a, tight: true, rawx: true, px: 4, h: 150, label: "Heart rate over time"})}</div>`;
+    <div class="chart">${seriesChart(pts, {unit: " bpm", colour: "var(--acc)", kind: "line", goal: a, tight: true, rawx: true, px: 4, h: 150, label: "Heart rate over time"})}</div>
+    ${zoneBlock(d)}`;
+}
+// Time in each HR zone, using the zones set in intervals.icu (d.zones = top bpm of each zone).
+const ZONE_COLS = ["var(--carb)", "var(--fat)", "#E8D36A", "#FFA25C", "var(--over)", "var(--acc)", "var(--acc2)"];
+function zoneBlock(d){
+  if (!Array.isArray(d.zones) || !Array.isArray(d.zoneTimes)) {
+    return `<div class="muted small" style="margin-top:8px">${d.zonesError === "NO_ZONES" ? "No zone breakdown from intervals.icu for this run." : d.zonesError ? "Couldn't load zones (" + esc(String(d.zonesError)) + ")." : "Zones not loaded. Hide and reopen heart rate to fetch them."}</div>`;
+  }
+  const n = Math.min(d.zones.length, d.zoneTimes.length);
+  const secs = d.zoneTimes.slice(0, n).map(x => Math.max(0, Number(x) || 0));
+  const tot = secs.reduce((x, y) => x + y, 0);
+  if (!tot) return `<div class="muted small" style="margin-top:8px">No time recorded in any zone.</div>`;
+  const rng = i => i === 0 ? "≤" + d.zones[0] : (d.zones[i-1] + 1) + "–" + d.zones[i];
+  const tm = s => Math.floor(s / 60) + ":" + String(Math.round(s % 60)).padStart(2, "0");
+  const pc = s => (Math.round(s / tot * 1000) / 10).toFixed(1) + "%";
+  const zs = secs.map((s, i) => ({i, s, name: "Zone " + (i + 1), rng: rng(i) + " bpm", t: tm(s), p: pc(s), c: ZONE_COLS[i % ZONE_COLS.length]}));
+  const sel = zs.reduce((b, z) => z.s > b.s ? z : b, zs[0]);
+  const R = 70, r = 46, C = 90;
+  const pt = (rad, ang) => [C + rad * Math.sin(ang), C - rad * Math.cos(ang)];
+  let ang = 0, paths = "";
+  zs.forEach(z => {
+    if (!z.s) return;
+    const sweep = z.s / tot * Math.PI * 2;
+    const tip = z.s === tot;
+    const a0 = ang, a1 = ang + (tip ? sweep - 0.0001 : sweep); ang += sweep;
+    const big = (a1 - a0) > Math.PI ? 1 : 0;
+    const [x0, y0] = pt(R, a0), [x1, y1] = pt(R, a1), [x2, y2] = pt(r, a1), [x3, y3] = pt(r, a0);
+    paths += `<path data-z="${z.i}" d="M${x0.toFixed(2)} ${y0.toFixed(2)}A${R} ${R} 0 ${big} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}L${x2.toFixed(2)} ${y2.toFixed(2)}A${r} ${r} 0 ${big} 0 ${x3.toFixed(2)} ${y3.toFixed(2)}Z" fill="${z.c}" stroke="var(--card)" stroke-width="2" style="cursor:pointer;opacity:${z.i === sel.i ? 1 : .55}"/>`;
+  });
+  const json = esc(JSON.stringify(zs.map(z => [z.name, z.p, z.rng + " · " + z.t])));
+  return `<div class="zonebox" data-zinfo="${json}" style="margin-top:12px">
+    <div class="small" style="font-weight:700;margin-bottom:4px">Heart-rate zones</div>
+    <div style="display:flex;justify-content:center">
+      <svg viewBox="0 0 180 180" width="200" height="200" role="img" aria-label="Time in heart-rate zones">${paths}
+        <text class="zn" x="90" y="76" text-anchor="middle" font-size="11" fill="var(--sub)">${esc(sel.name)}</text>
+        <text class="zp" x="90" y="98" text-anchor="middle" font-size="20" font-weight="700" fill="var(--ink)">${esc(sel.p)}</text>
+        <text class="zt" x="90" y="114" text-anchor="middle" font-size="9" fill="var(--sub)">${esc(sel.rng + " · " + sel.t)}</text>
+      </svg>
+    </div>
+    <div class="tablewrap"><table class="t"><thead><tr><th>Zone</th><th>BPM</th><th>Time</th><th>%</th></tr></thead><tbody>${zs.map(z =>
+      `<tr data-z="${z.i}" style="cursor:pointer"><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${z.c};margin-right:6px;vertical-align:-1px"></span>${z.i + 1}</td><td>${esc(rng(z.i))}</td><td>${z.t}</td><td>${z.p}</td></tr>`).join("")}</tbody></table></div>
+    <p class="muted small" style="margin-top:6px">Your zones from intervals.icu (top of zone ${d.zones[n-1]} bpm). Tap a slice or row.</p>
+  </div>`;
+}
+function wireZones(host){
+  host.querySelectorAll(".zonebox").forEach(box => {
+    let info; try { info = JSON.parse(box.dataset.zinfo); } catch(e){ return; }
+    box.querySelectorAll("[data-z]").forEach(el => el.onclick = () => {
+      const i = Number(el.dataset.z), z = info[i]; if (!z) return;
+      box.querySelector(".zn").textContent = z[0]; box.querySelector(".zp").textContent = z[1]; box.querySelector(".zt").textContent = z[2];
+      box.querySelectorAll("path[data-z]").forEach(p => p.style.opacity = Number(p.dataset.z) === i ? 1 : .55);
+    });
+  });
 }
 async function toggleHR(key){
   if (hrOpen.has(key)){ hrOpen.delete(key); renderTrain(); return; }
   hrOpen.add(key);
   if (!HR[key] || HR[key].error){
     const c = await kvGet("hr:" + key).catch(() => null);
-    if (c) HR[key] = c;
+    if (c && (c.zones || c.zonesError === "NO_ZONES")) HR[key] = c;   // older cached entries have no zones: refetch
     else {
       HR[key] = "loading"; renderTrain();
       const [date, miles] = key.split("|");
@@ -863,6 +916,7 @@ function renderTrain(){
       </div>`).join("") : `<div class="empty">No runs yet.</div>`}
       ${TD.lastImport ? `<p class="muted small">${esc(TD.lastImport)}</p>` : ""}`;
     host.querySelectorAll("[data-hr]").forEach(b => b.onclick = () => toggleHR(b.dataset.hr));
+    wireZones(host);
     return;
   }
 
