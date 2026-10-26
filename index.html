@@ -1449,14 +1449,15 @@ function recipeIngredientsFor(food, mult){
 function openLog(foodId){
   const food = foods.get(foodId); if (!food) return;
   const canWeigh = !!(food.serving && food.serving.size);
+  const useG = food.kind === "recipe" && canWeigh;
   const hour = new Date().getHours();
   const defMeal = hour < 11 ? "Breakfast" : hour < 15 ? "Lunch" : hour < 21 ? "Dinner" : "Snacks";
   $("#logBody").innerHTML = `
     <h2>${esc(food.name)}</h2>
     <p class="muted small">Label serving: ${esc(food.kind==="recipe"?"1 of "+food.yield+" servings":(food.serving.text||"1 serving"))}${canWeigh?` = ${fmt(food.serving.size,"g")} ${food.serving.unit}`:""}</p>
     <div class="grid2">
-      <div><label class="f" for="lg-amt">How much you had</label><input type="number" id="lg-amt" step="any" min="0" value="1"></div>
-      <div><label class="f" for="lg-unit">Unit</label><select id="lg-unit"><option value="serv">servings</option>${canWeigh?`<option value="${food.serving.unit}">${food.serving.unit}</option>`:""}</select></div>
+      <div><label class="f" for="lg-amt">How much you had</label><input type="number" id="lg-amt" step="any" min="0" value="${useG?Math.round(food.serving.size):1}"></div>
+      <div><label class="f" for="lg-unit">Unit</label><select id="lg-unit"><option value="serv">servings</option>${canWeigh?`<option value="${food.serving.unit}" ${useG?"selected":""}>${food.serving.unit}</option>`:""}</select></div>
       <div><label class="f" for="lg-meal">Meal</label><select id="lg-meal">${MEALS.map(m=>`<option ${m===defMeal?"selected":""}>${m}</option>`).join("")}</select></div>
       <div><label class="f" for="lg-date">Date</label><input type="date" id="lg-date" value="${curDate}"></div>
     </div>
@@ -1497,9 +1498,9 @@ function openRecipe(existing){
     <button class="btn ghost sm" id="rc-add" style="margin-top:8px">Add ingredient</button>
     <div class="grid2">
       <div><label class="f" for="rc-yield">Servings it makes</label><input type="number" id="rc-yield" min="1" step="any" value="${existing?existing.yield:4}"></div>
-      <div><label class="f" for="rc-wt">Cooked weight, g (optional)</label><input type="number" id="rc-wt" min="0" step="any" value="${existing&&existing.totalWeight?existing.totalWeight:""}"></div>
+      <div><label class="f" for="rc-wt">Cooked weight, g (optional)</label><input type="number" id="rc-wt" min="0" step="any" value="${existing&&existing.totalWeight&&existing.weightSrc!=="raw"?existing.totalWeight:""}"></div>
     </div>
-    <p class="muted small">Add the cooked weight if you want to log this recipe by grams later.</p>
+    <p class="muted small">Weigh the finished batch and enter it for the most accurate grams. If blank, the raw ingredient weight is used.</p>
     <div id="rc-sum"></div>
     <div class="row" style="margin-top:14px"><button class="btn" id="rc-save">Save recipe</button><button class="btn ghost" id="rc-cancel">Cancel</button></div>`;
   const opts = sel => ingFoods.map(f => `<option value="${esc(f.id)}" ${f.id===sel?"selected":""}>${esc(f.name)}</option>`).join("");
@@ -1521,29 +1522,33 @@ function openRecipe(existing){
   };
   const compute = () => {
     const yld = num($("#rc-yield").value) || 1;
-    const parts = []; let bad = [];
+    const parts = []; let bad = []; let rawG = 0; const noWt = [];
     for (const r of recRows){ const f = foods.get(r.foodId); if (!f) continue;
       const unit = (r.unit === "serv" || (f.serving && f.serving.size)) ? r.unit : "serv";
       const m = multFor(f, r.amount, unit); if (m === null){ bad.push(f.name); continue; }
-      parts.push({foodId:f.id, name:f.name, amount:r.amount, unit, mult:m, n:scaleN(f.n, m), extra:scaleExtra(f.extra, m)}); }
+      parts.push({foodId:f.id, name:f.name, amount:r.amount, unit, mult:m, n:scaleN(f.n, m), extra:scaleExtra(f.extra, m)});
+      const gu = unit === "serv" ? (f.serving && f.serving.size ? f.serving.unit : null) : unit;
+      const gq = unit === "serv" ? (f.serving && f.serving.size ? r.amount * f.serving.size : 0) : r.amount;
+      const gf = gu === "g" ? 1 : gu === "oz" ? 28.3495 : null;
+      if (gf === null) noWt.push(f.name); else rawG += gq * gf; }
     const total = sumN(parts.map(p => p.n)); const per = scaleN(total, 1/yld);
     const extra = scaleExtra(sumExtra(parts.map(p => p.extra)), 1/yld);
-    return {parts, total, per, yld, bad, extra};
+    return {parts, total, per, yld, bad, extra, rawG: Math.round(rawG), noWt};
   };
   const summary = () => {
     const c = compute();
-    $("#rc-sum").innerHTML = `<div class="note">Whole batch: <b>${fmt(c.total.cal,"")} cal</b>, ${fmt(c.total.protein,"g")}g protein.<br>Per serving (÷ ${fmt(c.yld,"g")}): <b>${fmt(c.per.cal,"")} cal</b>, ${fmt(c.per.protein,"g")}g protein, ${fmt(c.per.carbs,"g")}g carbs, ${fmt(c.per.fat,"g")}g fat.${c.bad.length?`<br><span class="over-t">Skipped (no serving weight on file): ${c.bad.map(esc).join(", ")}</span>`:""}</div>`;
+    $("#rc-sum").innerHTML = `<div class="note">Whole batch: <b>${fmt(c.total.cal,"")} cal</b>, ${fmt(c.total.protein,"g")}g protein.<br>Per serving (÷ ${fmt(c.yld,"g")}): <b>${fmt(c.per.cal,"")} cal</b>, ${fmt(c.per.protein,"g")}g protein, ${fmt(c.per.carbs,"g")}g carbs, ${fmt(c.per.fat,"g")}g fat.<br>Raw ingredient weight: <b>${fmt(c.rawG,"g")} g</b>${num($("#rc-wt").value)?" (not used, cooked weight entered)":" (used for logging by grams while cooked weight is blank)"}.${c.noWt.length?`<br><span class="over-t">Not in raw weight (no gram weight on file): ${c.noWt.map(esc).join(", ")}</span>`:""}${c.bad.length?`<br><span class="over-t">Skipped (no serving weight on file): ${c.bad.map(esc).join(", ")}</span>`:""}</div>`;
   };
-  $("#rc-yield").oninput = summary;
+  $("#rc-yield").oninput = summary; $("#rc-wt").oninput = summary;
   $("#rc-add").onclick = () => { recRows.push({foodId:ingFoods[0].id, amount:1, unit:"serv"}); drawRows(); };
   $("#rc-cancel").onclick = () => $("#recDlg").close();
   $("#rc-save").onclick = () => {
     const c = compute(); const name = $("#rc-name").value.trim();
     if (!name){ $("#rc-name").focus(); return; }
     if (!c.parts.length){ toast("Add at least one ingredient"); return; }
-    const wt = num($("#rc-wt").value);
+    const cw = num($("#rc-wt").value); const wt = cw || c.rawG || null;
     const food = {id: existing ? existing.id : uid6(), kind:"recipe", created: existing ? existing.created : Date.now(), name,
-      serving:{text:"1 serving", size: wt ? wt / c.yld : null, unit:"g"}, perContainer:c.yld, yield:c.yld, totalWeight:wt,
+      serving:{text:"1 serving", size: wt ? wt / c.yld : null, unit:"g"}, perContainer:c.yld, yield:c.yld, totalWeight:wt, weightSrc: cw ? "cooked" : "raw",
       n:c.per, extra:c.extra, ingredients:c.parts.map(p => ({foodId:p.foodId, name:p.name, amount:p.amount, unit:p.unit}))};
     saveFood(food); $("#recDlg").close(); toast("Saved " + name);
   };
