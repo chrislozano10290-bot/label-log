@@ -284,6 +284,9 @@ a{color:var(--acc)}
     <h2>Default targets</h2>
     <p class="muted small">Used on days that aren't inside a training block.</p>
     <form id="goalForm"></form>
+    <h2>Heart-rate zones</h2>
+    <p class="muted small">Top bpm of each zone. Used for the zone breakdown on each run. Leave on intervals.icu to use the zones set there.</p>
+    <form id="zoneForm"></form>
     <h2>Sync with your spreadsheet</h2>
     <div class="status" id="status" style="margin-bottom:8px">Loading…</div>
     <p class="muted">Everything saves on this phone first, so the app works with no signal. When you're online, changes are sent to THEMAGNUMOPUS automatically: Food Log gets one row per food, Food Daily Totals adds up each day, and and Food Library holds your saved foods.</p>
@@ -812,9 +815,20 @@ function hrBlock(key, avg){
     <div class="chart">${seriesChart(pts, {unit: " bpm", colour: "var(--acc)", kind: "line", goal: a, tight: true, rawx: true, px: 4, h: 150, label: "Heart rate over time"})}</div>
     ${zoneBlock(d)}`;
 }
-// Time in each HR zone, using the zones set in intervals.icu (d.zones = top bpm of each zone).
+// Time in each HR zone: custom zones from Settings if set, else the zones from intervals.icu (d.zones = top bpm of each zone).
 const ZONE_COLS = ["var(--carb)", "var(--fat)", "#E8D36A", "#FFA25C", "var(--over)", "var(--acc)", "var(--acc2)"];
+// Custom zones (Settings) = array of top bpm, ascending. null/invalid = use intervals.icu.
+const validZones = z => Array.isArray(z) && z.length >= 2 && z.length <= 7 && z.every((v, i) => Number.isInteger(v) && v >= 40 && v <= 250 && (i === 0 || v > z[i-1]));
+let icuZones = null;
+function noteIcuZones(d){ if (d && validZones(d.zones) && JSON.stringify(d.zones) !== JSON.stringify(icuZones)){ icuZones = d.zones.slice(); kvSet("icuZones", icuZones).catch(()=>{}); } }
+kvGet("icuZones").then(z => { if (!icuZones && validZones(z)) icuZones = z; }).catch(()=>{});
 function zoneBlock(d){
+  const custom = validZones(profile.hrZones) && Array.isArray(d.hr) && d.hr.length;
+  if (custom){
+    const zt = profile.hrZones, step = d.step || 30, t = zt.map(() => 0);
+    d.hr.forEach(v => { v = Number(v); if (!isFinite(v) || v <= 0) return; let i = zt.findIndex(top => v <= top); if (i < 0) i = zt.length - 1; t[i] += step; });
+    d = Object.assign({}, d, {zones: zt, zoneTimes: t, zoneSrc: "custom"});
+  }
   if (!Array.isArray(d.zones) || !Array.isArray(d.zoneTimes)) {
     return `<div class="muted small" style="margin-top:8px">${d.zonesError === "NO_ZONES" ? "No zone breakdown from intervals.icu for this run." : d.zonesError ? "Couldn't load zones (" + esc(String(d.zonesError)) + ")." : "Zones not loaded. Hide and reopen heart rate to fetch them."}</div>`;
   }
@@ -851,7 +865,7 @@ function zoneBlock(d){
     </div>
     <div class="tablewrap"><table class="t"><thead><tr><th>Zone</th><th>BPM</th><th>Time</th><th>%</th></tr></thead><tbody>${zs.map(z =>
       `<tr data-z="${z.i}" style="cursor:pointer"><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${z.c};margin-right:6px;vertical-align:-1px"></span>${z.i + 1}</td><td>${esc(rng(z.i))}</td><td>${z.t}</td><td>${z.p}</td></tr>`).join("")}</tbody></table></div>
-    <p class="muted small" style="margin-top:6px">Your zones from intervals.icu (top of zone ${d.zones[n-1]} bpm). Tap a slice or row.</p>
+    <p class="muted small" style="margin-top:6px">${d.zoneSrc === "custom" ? `Your zones from Settings, counted from the heart-rate points above (one every ${d.step || 30} sec), so times are close but not exact. Anything over ${d.zones[n-1]} bpm counts as zone ${n}.` : `Your zones from intervals.icu (top of zone ${d.zones[n-1]} bpm).`} Tap a slice or row.</p>
   </div>`;
 }
 function wireZones(host){
@@ -869,11 +883,11 @@ async function toggleHR(key){
   hrOpen.add(key);
   if (!HR[key] || HR[key].error){
     const c = await kvGet("hr:" + key).catch(() => null);
-    if (c && (c.zones || c.zonesError === "NO_ZONES")) HR[key] = c;   // older cached entries have no zones: refetch
+    if (c && (c.zones || c.zonesError === "NO_ZONES")) { HR[key] = c; noteIcuZones(c); }   // older cached entries have no zones: refetch
     else {
       HR[key] = "loading"; renderTrain();
       const [date, miles] = key.split("|");
-      try { const d = await remote("llGetHRStream", [date, Number(miles)], 120000); HR[key] = d; if (!d.error) await kvSet("hr:" + key, d); }
+      try { const d = await remote("llGetHRStream", [date, Number(miles)], 120000); HR[key] = d; if (!d.error) await kvSet("hr:" + key, d); noteIcuZones(d); }
       catch(e){ HR[key] = {error: String(e.message)}; }
     }
   }
@@ -1105,7 +1119,7 @@ function render(){
   if (curTab === "today") renderToday();
   if (curTab === "foods") renderFoods();
   if (curTab === "progress") renderProgress();
-  if (curTab === "more"){ renderBlocks(); renderGoals(); renderSources(); }
+  if (curTab === "more"){ renderBlocks(); renderGoals(); renderZones(); renderSources(); }
 }
 
 function blockFor(date){ return (profile.blocks||[]).find(b => b.start && b.end && b.start <= date && date <= b.end && b.targets) || null; }
@@ -1743,6 +1757,31 @@ function blockFeedback(b){
   out.actual = slope * 7; out.target = computeBlock(b.inputs).weeklyLb;
   out.change = Math.round((out.target - out.actual) * 500 / 50) * 50;
   return out;
+}
+let zoneDraft = null;
+function renderZones(force){
+  const f = $("#zoneForm"); if (!f || (!force && f.contains(document.activeElement))) return;
+  const custom = validZones(profile.hrZones);
+  const z = zoneDraft || (custom ? profile.hrZones : (icuZones || [120, 140, 155, 170, 185]));
+  f.innerHTML = `
+    <div class="small" style="margin-bottom:6px">Using: <b>${custom ? "your zones" : "intervals.icu"}</b>${!custom && !icuZones ? " (open a run's heart rate once to load them; boxes show placeholders)" : ""}</div>
+    <div class="grid2">${z.map((v, i) => `<div><label class="f" for="hz-${i}">Zone ${i + 1} top (bpm)</label><input type="number" inputmode="numeric" id="hz-${i}" value="${v}"></div>`).join("")}</div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn ghost grow" type="button" id="hzLess" ${z.length <= 2 ? "disabled" : ""}>− Zone</button>
+      <button class="btn ghost grow" type="button" id="hzMore" ${z.length >= 7 ? "disabled" : ""}>+ Zone</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn ghost grow" type="button" id="hzIcu">Use intervals.icu</button>
+      <button class="btn grow" type="submit">Save zones</button>
+    </div>`;
+  const read = () => z.map((_, i) => Number($("#hz-" + i).value));
+  $("#hzLess").onclick = () => { zoneDraft = read().slice(0, -1); renderZones(true); };
+  $("#hzMore").onclick = () => { const r = read(); zoneDraft = r.concat([Math.min(250, (r[r.length - 1] || 180) + 10)]); renderZones(true); };
+  $("#hzIcu").onclick = () => { zoneDraft = null; profile.hrZones = null; saveProfile(); toast("Using intervals.icu zones"); renderZones(true); };
+  f.onsubmit = e => { e.preventDefault();
+    const r = read();
+    if (!validZones(r)){ toast("Each zone needs a whole number from 40 to 250, higher than the zone before."); return; }
+    zoneDraft = null; profile.hrZones = r; saveProfile(); document.activeElement.blur(); toast("Zones saved"); renderZones(true); };
 }
 function renderBlocks(){
   if (!$("#blockList")) return;
