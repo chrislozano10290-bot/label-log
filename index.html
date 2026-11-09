@@ -893,6 +893,104 @@ async function toggleHR(key){
   }
   renderTrain();
 }
+// Weekly running breakdown (Train tab). Weeks start Monday (weekKey). Miles/time/avg HR come from the Run Log rows;
+// time and miles per HR zone come from each run's heart-rate + distance stream (llGetHRStream), loaded when a week is opened.
+const wkOpen = new Set(), wkBusy = new Set(); let wkShow = 4;
+const hrHasDist = c => c && !c.error && Array.isArray(c.hr) && c.hr.length && Array.isArray(c.dist);
+async function loadRunStream(key){
+  if (hrHasDist(HR[key])) return HR[key];
+  const c = await kvGet("hr:" + key).catch(() => null);
+  if (hrHasDist(c)) { HR[key] = c; noteIcuZones(c); return c; }
+  const [date, miles] = key.split("|");
+  try { const d = await remote("llGetHRStream", [date, Number(miles)], 120000); if (!d.error) { HR[key] = d; await kvSet("hr:" + key, d); noteIcuZones(d); } return d; }
+  catch(e){ return {error: String(e.message)}; }
+}
+async function toggleWeek(wk){
+  if (wkOpen.has(wk)){ wkOpen.delete(wk); renderTrain(); return; }
+  wkOpen.add(wk); wkBusy.add(wk); renderTrain();
+  const keys = (TD.series.runs || []).filter(r => weekKey(r[0]) === wk).map(r => r[0] + "|" + r[1]);
+  for (const k of keys){ if (!hrHasDist(HR[k])) { const d = await loadRunStream(k); if (d && d.error && !hrHasDist(HR[k])) HR["wkerr:" + k] = d.error; } }
+  wkBusy.delete(wk); renderTrain();
+}
+// Split one week's runs into zones. Returns {zones, t:[sec], mi:[miles], noHr, noDist, errs, mixed}.
+function weekZones(runs){
+  const custom = validZones(profile.hrZones);
+  let zones = null, mixed = false; const out = {noHr: 0, noDist: 0, errs: 0};
+  const per = [];
+  runs.forEach(r => {
+    const key = r[0] + "|" + r[1], d = HR[key];
+    if (!hrHasDist(d)) { if (HR["wkerr:" + key] === "NO_HR" || HR["wkerr:" + key] === "NO_ID") out.noHr++; else out.errs++; return; }
+    const z = custom ? profile.hrZones : (validZones(d.zones) ? d.zones : icuZones);
+    if (!validZones(z)) { out.errs++; return; }
+    if (!zones) zones = z; else if (JSON.stringify(z) !== JSON.stringify(zones)) mixed = true;
+    per.push({r, d, z});
+  });
+  if (!zones) return Object.assign(out, {zones: null});
+  const n = zones.length, t = zones.map(() => 0), mi = zones.map(() => 0);
+  per.forEach(({r, d, z}) => {
+    const step = d.step || 30, idx = v => { let i = z.findIndex(top => v <= top); return Math.min(n - 1, i < 0 ? z.length - 1 : i); };
+    // Time: intervals.icu's own zone seconds when using its zones (exact); else 30-sec chunks.
+    if (!custom && Array.isArray(d.zoneTimes) && JSON.stringify(z) === JSON.stringify(d.zones)) d.zoneTimes.slice(0, n).forEach((s, i) => t[i] += Math.max(0, Number(s) || 0));
+    else d.hr.forEach(v => { v = Number(v); if (v > 0) t[idx(v)] += step; });
+    // Miles: meters per chunk, scaled so the run's zones add up to its Run Log miles.
+    const m = d.dist.map(x => Math.max(0, Number(x) || 0)), tot = m.reduce((a, b) => a + b, 0), runMi = Number(r[1]) || 0;
+    if (!tot || d.dist.length !== d.hr.length) { out.noDist++; return; }
+    const f = runMi ? runMi / tot : 1 / 1609.344;
+    d.hr.forEach((v, i) => { v = Number(v); if (v > 0) mi[idx(v)] += m[i] * f; });
+  });
+  return Object.assign(out, {zones, t, mi, mixed, src: custom ? "custom" : "icu"});
+}
+function weeklyBlock(){
+  const runs = TD.series.runs || [], by = {};
+  runs.forEach(r => { if (!r[0]) return; const k = weekKey(String(r[0]).slice(0, 10)); (by[k] = by[k] || []).push(r); });
+  const wks = Object.keys(by).sort().reverse();
+  if (!wks.length) return "";
+  const thisWk = weekKey(today()), md = iso => new Date(iso + "T12:00:00").toLocaleDateString(undefined, {month: "short", day: "numeric"});
+  const tm = s => { s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? h + "h " + m + "m" : m + "m"; };
+  const card = wk => {
+    const rs = by[wk], miles = rs.reduce((a, r) => a + (Number(r[1]) || 0), 0), mins = rs.reduce((a, r) => a + (Number(r[2]) || 0), 0);
+    const hrs = rs.map(r => Number(r[3])).filter(v => v > 0), avg = hrs.length ? hrs.reduce((a, b) => a + b, 0) / hrs.length : NaN;
+    let zones = "";
+    if (wkOpen.has(wk)) {
+      if (wkBusy.has(wk)) zones = `<div class="muted small" style="margin-top:8px">Loading heart rate for ${rs.length} run${rs.length > 1 ? "s" : ""}…</div>`;
+      else {
+        const w = weekZones(rs);
+        if (!w.zones) zones = `<div class="muted small" style="margin-top:8px">No heart-rate zone data for these runs${w.errs ? " (some couldn't load; tap again to retry)" : ""}.</div>`;
+        else {
+          const tT = w.t.reduce((a, b) => a + b, 0), tM = w.mi.reduce((a, b) => a + b, 0);
+          const rng = i => i === 0 ? "≤" + w.zones[0] : (w.zones[i - 1] + 1) + "–" + w.zones[i];
+          const notes = [];
+          if (w.noHr) notes.push(`${w.noHr} run${w.noHr > 1 ? "s have" : " has"} no heart-rate recording and ${w.noHr > 1 ? "aren't" : "isn't"} counted in zones.`);
+          if (w.errs) notes.push(`${w.errs} run${w.errs > 1 ? "s" : ""} couldn't load. Close and reopen the week to retry.`);
+          if (w.noDist) notes.push(`${w.noDist} run${w.noDist > 1 ? "s have" : " has"} no distance stream, so ${w.noDist > 1 ? "they count" : "it counts"} for time only.`);
+          if (w.mixed) notes.push("Your intervals.icu zones changed during this week; zones are matched by number.");
+          zones = `<div class="tablewrap" style="margin-top:10px"><table class="t"><thead><tr><th>Zone</th><th>BPM</th><th>Time</th><th>Miles</th></tr></thead><tbody>` +
+            w.zones.map((z, i) => `<tr><td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${ZONE_COLS[i % ZONE_COLS.length]};margin-right:6px"></span>Zone ${i + 1}</td><td>${rng(i)}</td><td>${hhmmss(w.t[i] / 60)}</td><td>${(Math.round(w.mi[i] * 100) / 100).toFixed(2)}</td></tr>`).join("") +
+            `<tr><td><b>Total</b></td><td></td><td><b>${hhmmss(tT / 60)}</b></td><td><b>${(Math.round(tM * 100) / 100).toFixed(2)}</b></td></tr></tbody></table></div>
+            <p class="muted small" style="margin-top:6px">${w.src === "custom" ? "Your zones from Settings." : "Zones from intervals.icu."} ${w.src === "custom" ? "Time and miles" : "Miles"} are counted in ${30}-second chunks of heart rate and distance, so they're close but not exact.${w.src === "custom" ? "" : " Time is intervals.icu's own zone time."} Each run's zone miles are scaled to match its Run Log miles.</p>` +
+            (notes.length ? `<p class="muted small">${notes.map(esc).join(" ")}</p>` : "");
+        }
+      }
+    }
+    return `<div class="card" style="margin-bottom:8px">
+      <div class="row" style="justify-content:space-between;align-items:baseline">
+        <div style="font-family:var(--display);font-weight:700">Week of ${esc(md(wk))}</div>
+        <div class="small muted">${wk === thisWk ? "This week · " : ""}${rs.length} run${rs.length > 1 ? "s" : ""}</div>
+      </div>
+      <div class="macros" style="margin-top:6px">
+        <div class="macro"><div class="mk">Miles</div><div class="mv">${(Math.round(miles * 10) / 10).toFixed(1)}</div></div>
+        <div class="macro"><div class="mk">Time</div><div class="mv">${mins ? tm(mins * 60) : "–"}</div></div>
+        <div class="macro"><div class="mk">Avg HR</div><div class="mv">${fmt(avg, "")}</div></div>
+      </div>
+      <button class="btn sm ghost" data-wk="${esc(wk)}" style="margin-top:8px">${wkOpen.has(wk) ? "Hide zones" : "Zones"}</button>
+      ${zones}
+    </div>`;
+  };
+  return `<h3>Weekly breakdown</h3>
+    <p class="muted small">Avg HR is the plain average of each run's average heart rate.</p>
+    ${wks.slice(0, wkShow).map(card).join("")}
+    ${wks.length > wkShow ? `<button class="btn sm ghost" id="wkMore" style="margin-bottom:12px">Show more weeks</button>` : ""}`;
+}
 function renderTrain(){
   const host = $("#trainBody"); if (!host) return;
   $("#trainSeg").querySelectorAll("[data-ts]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.ts === tSec)));
@@ -912,6 +1010,7 @@ function renderTrain(){
         <h3 style="margin:4px 0 6px">${esc(g.am || "Rest")}</h3>
         <div class="muted small">${esc(g.note || "")}</div>
       </div>
+      ${weeklyBlock()}
       <h3>Previous runs</h3>
       ${runs.length ? runs.map(r => `<div class="card" style="margin-bottom:8px">
         <div class="row" style="justify-content:space-between;align-items:baseline">
@@ -930,6 +1029,8 @@ function renderTrain(){
       </div>`).join("") : `<div class="empty">No runs yet.</div>`}
       ${TD.lastImport ? `<p class="muted small">${esc(TD.lastImport)}</p>` : ""}`;
     host.querySelectorAll("[data-hr]").forEach(b => b.onclick = () => toggleHR(b.dataset.hr));
+    host.querySelectorAll("[data-wk]").forEach(b => b.onclick = () => toggleWeek(b.dataset.wk));
+    { const mb = $("#wkMore"); if (mb) mb.onclick = () => { wkShow += 4; renderTrain(); }; }
     wireZones(host);
     return;
   }
