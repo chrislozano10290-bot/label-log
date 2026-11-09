@@ -248,6 +248,7 @@ a{color:var(--acc)}
     <h2 id="trainHead">Training</h2>
     <div class="seg" role="group" aria-label="Training section" id="trainSeg">
       <button data-ts="run" aria-pressed="false">Run</button>
+      <button data-ts="weekly" aria-pressed="false">Weekly</button>
       <button data-ts="strength" aria-pressed="true">Strength</button>
       <button data-ts="stretch" aria-pressed="false">Stretch &amp; Iso</button>
     </div>
@@ -895,7 +896,7 @@ async function toggleHR(key){
 }
 // Weekly running breakdown (Train tab). Weeks start Monday (weekKey). Miles/time/avg HR come from the Run Log rows;
 // time and miles per HR zone come from each run's heart-rate + distance stream (llGetHRStream), loaded when a week is opened.
-const wkOpen = new Set(), wkBusy = new Set(); let wkShow = 4;
+const wkOpen = new Set(), wkBusy = new Set(), wkMode = {}; let wkShow = 4;   // wkMode[week] = "time" | "miles" (donut split)
 const hrHasDist = c => c && !c.error && Array.isArray(c.hr) && c.hr.length && Array.isArray(c.dist);
 async function loadRunStream(key){
   if (hrHasDist(HR[key])) return HR[key];
@@ -940,6 +941,38 @@ function weekZones(runs){
   });
   return Object.assign(out, {zones, t, mi, mixed, src: custom ? "custom" : "icu"});
 }
+// Week's zone donut: same drawing as zoneBlock (single run), split by time or miles.
+function weekDonut(wk, w, mode, rng, tT, tM){
+  const vals = mode === "miles" ? w.mi : w.t, tot = vals.reduce((a, b) => a + b, 0);
+  const tmS = s => hhmmss(s / 60), miS = m => (Math.round(m * 100) / 100).toFixed(2) + " mi";
+  const seg = `<div class="row" style="gap:6px;margin-top:10px">${[["time","Time"],["miles","Miles"]].map(([k, l]) =>
+    `<button class="chip" data-wkm="${esc(wk + "|" + k)}" ${k === mode ? `style="background:var(--acc);color:#1A0D16;border-color:var(--acc)"` : ""}>${l}</button>`).join("")}</div>`;
+  const table = `<div class="tablewrap" style="margin-top:6px"><table class="t"><thead><tr><th>Zone</th><th>BPM</th><th>Time</th><th>Miles</th><th>%</th></tr></thead><tbody>` +
+    w.zones.map((z, i) => `<tr data-z="${i}" style="cursor:pointer"><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${ZONE_COLS[i % ZONE_COLS.length]};margin-right:6px;vertical-align:-1px"></span>${i + 1}</td><td>${rng(i)}</td><td>${tmS(w.t[i])}</td><td>${(Math.round(w.mi[i] * 100) / 100).toFixed(2)}</td><td>${tot ? (Math.round(vals[i] / tot * 1000) / 10).toFixed(1) + "%" : "–"}</td></tr>`).join("") +
+    `<tr><td><b>Total</b></td><td></td><td><b>${tmS(tT)}</b></td><td><b>${(Math.round(tM * 100) / 100).toFixed(2)}</b></td><td></td></tr></tbody></table></div>`;
+  if (!tot) return seg + `<div class="muted small" style="margin-top:8px">No ${mode === "miles" ? "distance" : "time"} recorded in any zone.</div>` + table;
+  const zs = vals.map((v, i) => ({i, s: v, name: "Zone " + (i + 1), rng: rng(i) + " bpm", v: mode === "miles" ? miS(v) : tmS(v), p: (Math.round(v / tot * 1000) / 10).toFixed(1) + "%", c: ZONE_COLS[i % ZONE_COLS.length]}));
+  const sel = zs.reduce((b, z) => z.s > b.s ? z : b, zs[0]);
+  const R = 70, r = 46, C = 90, pt = (rad, a) => [C + rad * Math.sin(a), C - rad * Math.cos(a)];
+  let ang = 0, paths = "";
+  zs.forEach(z => {
+    if (!z.s) return;
+    const sweep = z.s / tot * Math.PI * 2, tip = z.s === tot;
+    const a0 = ang, a1 = ang + (tip ? sweep - 0.0001 : sweep); ang += sweep;
+    const big = (a1 - a0) > Math.PI ? 1 : 0;
+    const [x0, y0] = pt(R, a0), [x1, y1] = pt(R, a1), [x2, y2] = pt(r, a1), [x3, y3] = pt(r, a0);
+    paths += `<path data-z="${z.i}" d="M${x0.toFixed(2)} ${y0.toFixed(2)}A${R} ${R} 0 ${big} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}L${x2.toFixed(2)} ${y2.toFixed(2)}A${r} ${r} 0 ${big} 0 ${x3.toFixed(2)} ${y3.toFixed(2)}Z" fill="${z.c}" stroke="var(--card)" stroke-width="2" style="cursor:pointer;opacity:${z.i === sel.i ? 1 : .55}"/>`;
+  });
+  const json = esc(JSON.stringify(zs.map(z => [z.name, z.p, z.rng + " · " + z.v])));
+  return seg + `<div class="zonebox" data-zinfo="${json}" style="margin-top:8px">
+    <div style="display:flex;justify-content:center">
+      <svg viewBox="0 0 180 180" width="200" height="200" role="img" aria-label="${mode === "miles" ? "Miles" : "Time"} in heart-rate zones">${paths}
+        <text class="zn" x="90" y="76" text-anchor="middle" font-size="11" fill="var(--sub)">${esc(sel.name)}</text>
+        <text class="zp" x="90" y="98" text-anchor="middle" font-size="20" font-weight="700" fill="var(--ink)">${esc(sel.p)}</text>
+        <text class="zt" x="90" y="114" text-anchor="middle" font-size="9" fill="var(--sub)">${esc(sel.rng + " · " + sel.v)}</text>
+      </svg>
+    </div>${table}</div>`;
+}
 function weeklyBlock(){
   const runs = TD.series.runs || [], by = {};
   runs.forEach(r => { if (!r[0]) return; const k = weekKey(String(r[0]).slice(0, 10)); (by[k] = by[k] || []).push(r); });
@@ -964,10 +997,9 @@ function weeklyBlock(){
           if (w.errs) notes.push(`${w.errs} run${w.errs > 1 ? "s" : ""} couldn't load. Close and reopen the week to retry.`);
           if (w.noDist) notes.push(`${w.noDist} run${w.noDist > 1 ? "s have" : " has"} no distance stream, so ${w.noDist > 1 ? "they count" : "it counts"} for time only.`);
           if (w.mixed) notes.push("Your intervals.icu zones changed during this week; zones are matched by number.");
-          zones = `<div class="tablewrap" style="margin-top:10px"><table class="t"><thead><tr><th>Zone</th><th>BPM</th><th>Time</th><th>Miles</th></tr></thead><tbody>` +
-            w.zones.map((z, i) => `<tr><td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${ZONE_COLS[i % ZONE_COLS.length]};margin-right:6px"></span>Zone ${i + 1}</td><td>${rng(i)}</td><td>${hhmmss(w.t[i] / 60)}</td><td>${(Math.round(w.mi[i] * 100) / 100).toFixed(2)}</td></tr>`).join("") +
-            `<tr><td><b>Total</b></td><td></td><td><b>${hhmmss(tT / 60)}</b></td><td><b>${(Math.round(tM * 100) / 100).toFixed(2)}</b></td></tr></tbody></table></div>
-            <p class="muted small" style="margin-top:6px">${w.src === "custom" ? "Your zones from Settings." : "Zones from intervals.icu."} ${w.src === "custom" ? "Time and miles" : "Miles"} are counted in ${30}-second chunks of heart rate and distance, so they're close but not exact.${w.src === "custom" ? "" : " Time is intervals.icu's own zone time."} Each run's zone miles are scaled to match its Run Log miles.</p>` +
+          const mode = wkMode[wk] === "miles" ? "miles" : "time";
+          zones = weekDonut(wk, w, mode, rng, tT, tM) +
+            `<p class="muted small" style="margin-top:6px">${w.src === "custom" ? "Your zones from Settings." : "Zones from intervals.icu."} ${w.src === "custom" ? "Time and miles" : "Miles"} are counted in 30-second chunks of heart rate and distance, so they're close but not exact.${w.src === "custom" ? "" : " Time is intervals.icu's own zone time."} Each run's zone miles are scaled to match its Run Log miles. % is the share of ${mode === "miles" ? "miles" : "time"}.</p>` +
             (notes.length ? `<p class="muted small">${notes.map(esc).join(" ")}</p>` : "");
         }
       }
@@ -998,6 +1030,14 @@ function renderTrain(){
   if (!TD){ host.innerHTML = `<div class="empty">Couldn't load your plan yet. <button class="btn sm" id="tRetry" style="margin-top:8px">Try again</button></div>`;
     const r = $("#tRetry"); if (r) r.onclick = () => loadTraining(true); return; }
 
+  if (tSec === "weekly"){
+    host.innerHTML = weeklyBlock() || `<div class="empty">No runs yet.</div>`;
+    host.querySelectorAll("[data-wk]").forEach(b => b.onclick = () => toggleWeek(b.dataset.wk));
+    host.querySelectorAll("[data-wkm]").forEach(b => b.onclick = () => { const [wk, m] = b.dataset.wkm.split("|"); wkMode[wk] = m; renderTrain(); });
+    { const mb = $("#wkMore"); if (mb) mb.onclick = () => { wkShow += 4; renderTrain(); }; }
+    wireZones(host);
+    return;
+  }
   if (tSec === "run"){
     const g = (TD.glance || []).find(x => (x.day||"").slice(0,3) === todayAbbr()) || {};
     const runs = (TD.series.runs || []).slice().sort((a,b) => String(b[0]).localeCompare(String(a[0]))).slice(0, 30);
@@ -1010,7 +1050,6 @@ function renderTrain(){
         <h3 style="margin:4px 0 6px">${esc(g.am || "Rest")}</h3>
         <div class="muted small">${esc(g.note || "")}</div>
       </div>
-      ${weeklyBlock()}
       <h3>Previous runs</h3>
       ${runs.length ? runs.map(r => `<div class="card" style="margin-bottom:8px">
         <div class="row" style="justify-content:space-between;align-items:baseline">
@@ -1029,8 +1068,6 @@ function renderTrain(){
       </div>`).join("") : `<div class="empty">No runs yet.</div>`}
       ${TD.lastImport ? `<p class="muted small">${esc(TD.lastImport)}</p>` : ""}`;
     host.querySelectorAll("[data-hr]").forEach(b => b.onclick = () => toggleHR(b.dataset.hr));
-    host.querySelectorAll("[data-wk]").forEach(b => b.onclick = () => toggleWeek(b.dataset.wk));
-    { const mb = $("#wkMore"); if (mb) mb.onclick = () => { wkShow += 4; renderTrain(); }; }
     wireZones(host);
     return;
   }
